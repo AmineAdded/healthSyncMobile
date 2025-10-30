@@ -1,8 +1,6 @@
 package com.example.healthsync
 
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -24,7 +22,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -55,7 +52,9 @@ class MainActivity : ComponentActivity() {
         HealthPermission.getReadPermission(SpeedRecord::class),
         HealthPermission.getReadPermission(StepsCadenceRecord::class),
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
-        HealthPermission.getReadPermission(PowerRecord::class)
+        HealthPermission.getReadPermission(PowerRecord::class),
+        // ✅ NOUVELLE: Hydratation
+        HealthPermission.getReadPermission(HydrationRecord::class)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -112,14 +111,44 @@ class MainActivity : ComponentActivity() {
                 } else {
                     val missingPermissions = permissions - grantedPermissions
                     val missingCount = missingPermissions.size
-                    val missingList = missingPermissions.take(3).joinToString("\n") { permission ->
-                        permission.substringAfterLast(".")
-                    }
+
+                    // Message plus clair
+                    val message = """
+                        ⚠️ $missingCount permissions manquantes
+                        
+                        Dans Health Connect :
+                        1. Ouvrez "Autorisations d'application"
+                        2. Trouvez "HealthSync"
+                        3. Activez TOUTES les permissions
+                        4. Relancez l'application
+                    """.trimIndent()
+
                     Toast.makeText(
                         this@MainActivity,
-                        "❌ $missingCount permission(s) refusée(s)\n$missingList",
+                        message,
                         Toast.LENGTH_LONG
                     ).show()
+
+                    // Log des permissions manquantes
+                    Log.w("HealthSync", "Permissions manquantes ($missingCount):")
+                    missingPermissions.forEach { permission ->
+                        Log.w("HealthSync", "  - ${permission.substringAfterLast(".")}")
+                    }
+
+                    // Rediriger vers Health Connect après 3 secondes
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        try {
+                            val intent = android.content.Intent("androidx.health.ACTION_MANAGE_PERMISSIONS")
+                            intent.putExtra("android.intent.extra.PACKAGE_NAME", packageName)
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Ouvrez manuellement Health Connect > Autorisations",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }, 3000)
                 }
             }
         }
@@ -132,7 +161,19 @@ class MainActivity : ComponentActivity() {
             try {
                 val grantedPermissions = healthConnectClient.permissionController.getGrantedPermissions()
 
+                // Debug : Afficher les permissions accordées
+                Log.d("HealthSync", "Permissions accordées (${grantedPermissions.size}):")
+                grantedPermissions.forEach { permission ->
+                    Log.d("HealthSync", "  ✅ ${permission.substringAfterLast(".")}")
+                }
+
                 if (!grantedPermissions.containsAll(permissions)) {
+                    val missingPermissions = permissions - grantedPermissions
+                    Log.w("HealthSync", "Permissions manquantes (${missingPermissions.size}):")
+                    missingPermissions.forEach { permission ->
+                        Log.w("HealthSync", "  ❌ ${permission.substringAfterLast(".")}")
+                    }
+
                     requestPermissions.launch(permissions)
                 } else {
                     readAndSendData()
@@ -224,7 +265,7 @@ class MainActivity : ComponentActivity() {
             76 -> "Plank"
             77 -> "Abdos"
             78 -> "Jumping jack"
-            79 -> "Marche"  // Mi Fitness code pour Marche
+            79 -> "Marche"
             80 -> "Stretching"
             81 -> "Renforcement musculaire"
             82 -> "Cross training"
@@ -244,8 +285,6 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 val json = JSONObject()
-
-                // ✅ Lire les 7 derniers jours de 00:00 à 23:59
                 val today = LocalDate.now()
                 val daysData = JSONArray()
 
@@ -294,7 +333,6 @@ class MainActivity : ComponentActivity() {
                     }
                     dayJson.put("heartRate", hrArray)
 
-                    // Calcul BPM min/max/moyen
                     if (allHeartRates.isNotEmpty()) {
                         dayJson.put("minHeartRate", allHeartRates.minOrNull())
                         dayJson.put("maxHeartRate", allHeartRates.maxOrNull())
@@ -337,7 +375,7 @@ class MainActivity : ComponentActivity() {
                     dayJson.put("sleep", sleepArray)
                     dayJson.put("totalSleepHours", String.format("%.1f", totalSleepMinutes / 60.0))
 
-                    // 5️⃣ Exercise (ENRICHI) 🏋️‍♂️
+                    // 5️⃣ Exercise (COMPLET AVEC TOUTES LES MÉTRIQUES) 🏋️‍♂️
                     val exerciseRecords = healthConnectClient.readRecords(
                         ReadRecordsRequest(ExerciseSessionRecord::class, timeRangeFilter)
                     )
@@ -345,6 +383,7 @@ class MainActivity : ComponentActivity() {
 
                     for (record in exerciseRecords.records) {
                         val obj = JSONObject()
+                        val exerciseTimeRange = TimeRangeFilter.between(record.startTime, record.endTime)
 
                         // Infos de base
                         obj.put("title", record.title ?: "Exercice")
@@ -353,14 +392,10 @@ class MainActivity : ComponentActivity() {
                         obj.put("startTime", dateFormatter.format(record.startTime))
                         obj.put("endTime", dateFormatter.format(record.endTime))
 
-                        // Durée
                         val durationMinutes = java.time.Duration.between(record.startTime, record.endTime).toMinutes()
                         obj.put("durationMinutes", durationMinutes)
 
-                        // Récupérer les données associées à cet exercice
-                        val exerciseTimeRange = TimeRangeFilter.between(record.startTime, record.endTime)
-
-                        // Pas pendant l'exercice
+                        // ✅ 1. Pas pendant l'exercice
                         try {
                             val exerciseSteps = healthConnectClient.readRecords(
                                 ReadRecordsRequest(StepsRecord::class, exerciseTimeRange)
@@ -371,18 +406,42 @@ class MainActivity : ComponentActivity() {
                             obj.put("steps", 0)
                         }
 
-                        // Calories brûlées
+                        // ✅ 2. Distance pendant l'exercice
                         try {
-                            val caloriesRecords = healthConnectClient.readRecords(
-                                ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, exerciseTimeRange)
+                            val exerciseDistance = healthConnectClient.readRecords(
+                                ReadRecordsRequest(DistanceRecord::class, exerciseTimeRange)
                             )
-                            val totalCalories = caloriesRecords.records.sumOf { it.energy.inKilocalories.toInt() }
-                            obj.put("calories", totalCalories)
+                            val totalDistanceMeters = exerciseDistance.records.sumOf { it.distance.inMeters }
+                            obj.put("distanceMeters", totalDistanceMeters)
+                            obj.put("distanceKm", String.format("%.2f", totalDistanceMeters / 1000))
                         } catch (e: Exception) {
-                            obj.put("calories", 0)
+                            obj.put("distanceMeters", 0.0)
+                            obj.put("distanceKm", "0.00")
                         }
 
-                        // BPM moyen pendant l'exercice
+                        // ✅ 3. Calories ACTIVES brûlées
+                        try {
+                            val activeCalories = healthConnectClient.readRecords(
+                                ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, exerciseTimeRange)
+                            )
+                            val totalActiveCalories = activeCalories.records.sumOf { it.energy.inKilocalories.toInt() }
+                            obj.put("activeCalories", totalActiveCalories)
+                        } catch (e: Exception) {
+                            obj.put("activeCalories", 0)
+                        }
+
+                        // ✅ 4. Calories TOTALES brûlées
+                        try {
+                            val totalCalories = healthConnectClient.readRecords(
+                                ReadRecordsRequest(TotalCaloriesBurnedRecord::class, exerciseTimeRange)
+                            )
+                            val totalCaloriesBurned = totalCalories.records.sumOf { it.energy.inKilocalories.toInt() }
+                            obj.put("totalCalories", totalCaloriesBurned)
+                        } catch (e: Exception) {
+                            obj.put("totalCalories", 0)
+                        }
+
+                        // ✅ 5. BPM moyen pendant l'exercice
                         try {
                             val exerciseHR = healthConnectClient.readRecords(
                                 ReadRecordsRequest(HeartRateRecord::class, exerciseTimeRange)
@@ -390,28 +449,31 @@ class MainActivity : ComponentActivity() {
                             val allBPM = exerciseHR.records.flatMap { it.samples.map { s -> s.beatsPerMinute } }
                             if (allBPM.isNotEmpty()) {
                                 obj.put("avgHeartRate", allBPM.average().roundToInt())
+                                obj.put("minHeartRate", allBPM.minOrNull())
                                 obj.put("maxHeartRate", allBPM.maxOrNull())
                             }
                         } catch (e: Exception) {
                             obj.put("avgHeartRate", 0)
                         }
 
-                        // Cadence (pas/minute)
+                        // ✅ 6. Cadence (pas/minute) - MOYENNE, MIN, MAX
                         try {
                             val cadenceRecords = healthConnectClient.readRecords(
                                 ReadRecordsRequest(StepsCadenceRecord::class, exerciseTimeRange)
                             )
-                            val avgCadence = cadenceRecords.records
-                                .flatMap { it.samples.map { s -> s.rate } }
-                                .average()
-                            if (!avgCadence.isNaN()) {
-                                obj.put("avgCadence", avgCadence.roundToInt())
+                            val cadences = cadenceRecords.records.flatMap { it.samples.map { s -> s.rate } }
+                            if (cadences.isNotEmpty()) {
+                                obj.put("avgCadence", cadences.average().roundToInt())
+                                obj.put("minCadence", cadences.minOrNull()?.roundToInt() ?: 0)
+                                obj.put("maxCadence", cadences.maxOrNull()?.roundToInt() ?: 0)
                             }
                         } catch (e: Exception) {
                             obj.put("avgCadence", 0)
+                            obj.put("minCadence", 0)
+                            obj.put("maxCadence", 0)
                         }
 
-                        // Vitesse moyenne et foulée
+                        // ✅ 7. Vitesse moyenne/max ET calcul longueur de foulée min/max/moyenne
                         try {
                             val speedRecords = healthConnectClient.readRecords(
                                 ReadRecordsRequest(SpeedRecord::class, exerciseTimeRange)
@@ -419,17 +481,48 @@ class MainActivity : ComponentActivity() {
                             val speeds = speedRecords.records.flatMap { it.samples.map { s -> s.speed.inMetersPerSecond } }
                             if (speeds.isNotEmpty()) {
                                 val avgSpeedMs = speeds.average()
-                                obj.put("avgSpeedKmh", String.format("%.2f", avgSpeedMs * 3.6))
+                                val maxSpeedMs = speeds.maxOrNull()!!
+                                val minSpeedMs = speeds.minOrNull()!!
 
-                                // Calcul longueur de foulée (si on a vitesse et cadence)
-                                val cadence = obj.optInt("avgCadence", 0)
-                                if (cadence > 0) {
-                                    val strideLength = (avgSpeedMs * 60) / cadence
-                                    obj.put("avgStrideLengthMeters", String.format("%.2f", strideLength))
+                                obj.put("avgSpeedKmh", String.format("%.2f", avgSpeedMs * 3.6))
+                                obj.put("maxSpeedKmh", String.format("%.2f", maxSpeedMs * 3.6))
+                                obj.put("minSpeedKmh", String.format("%.2f", minSpeedMs * 3.6))
+
+                                // ✅ Calcul longueur de foulée MOYENNE/MIN/MAX (si cadence disponible)
+                                val avgCadence = obj.optInt("avgCadence", 0)
+                                val minCadence = obj.optInt("minCadence", 0)
+                                val maxCadence = obj.optInt("maxCadence", 0)
+
+                                if (avgCadence > 0) {
+                                    val avgStride = (avgSpeedMs * 60) / avgCadence
+                                    obj.put("avgStrideLengthMeters", String.format("%.2f", avgStride))
+                                }
+                                if (maxCadence > 0 && minSpeedMs > 0) {
+                                    val minStride = (minSpeedMs * 60) / maxCadence // foulée min = vitesse min / cadence max
+                                    obj.put("minStrideLengthMeters", String.format("%.2f", minStride))
+                                }
+                                if (minCadence > 0 && maxSpeedMs > 0) {
+                                    val maxStride = (maxSpeedMs * 60) / minCadence // foulée max = vitesse max / cadence min
+                                    obj.put("maxStrideLengthMeters", String.format("%.2f", maxStride))
                                 }
                             }
                         } catch (e: Exception) {
                             // Pas de vitesse disponible
+                        }
+
+                        // ✅ 8. Puissance (pour cyclisme)
+                        try {
+                            val powerRecords = healthConnectClient.readRecords(
+                                ReadRecordsRequest(PowerRecord::class, exerciseTimeRange)
+                            )
+                            val avgPower = powerRecords.records
+                                .flatMap { it.samples.map { s -> s.power.inWatts } }
+                                .average()
+                            if (!avgPower.isNaN()) {
+                                obj.put("avgPowerWatts", avgPower.roundToInt())
+                            }
+                        } catch (e: Exception) {
+                            // Pas de puissance disponible
                         }
 
                         exerciseArray.put(obj)
@@ -502,6 +595,27 @@ class MainActivity : ComponentActivity() {
                     }
                     dayJson.put("height", heightArray)
 
+                    // ✅ NOUVELLE: 1️⃣1️⃣ Hydratation 💧
+                    try {
+                        val hydrationRecords = healthConnectClient.readRecords(
+                            ReadRecordsRequest(HydrationRecord::class, timeRangeFilter)
+                        )
+                        val hydrationArray = JSONArray()
+                        var totalHydrationMl = 0.0
+                        for (record in hydrationRecords.records) {
+                            totalHydrationMl += record.volume.inMilliliters
+                            val obj = JSONObject()
+                            obj.put("volumeMl", record.volume.inMilliliters)
+                            obj.put("time", dateFormatter.format(record.startTime))
+                            hydrationArray.put(obj)
+                        }
+                        dayJson.put("hydration", hydrationArray)
+                        dayJson.put("totalHydrationLiters", String.format("%.2f", totalHydrationMl / 1000))
+                    } catch (e: Exception) {
+                        dayJson.put("hydration", JSONArray())
+                        dayJson.put("totalHydrationLiters", "0.00")
+                    }
+
                     // 🧠 Calcul du niveau de stress
                     val stressLevel = calculateStressLevel(
                         avgHeartRate = dayJson.optInt("avgHeartRate", 70),
@@ -528,35 +642,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // 🧠 Formule de calcul du stress
     private fun calculateStressLevel(avgHeartRate: Int, sleepHours: Double, steps: Int): String {
         var stressPoints = 0
 
-        // Facteur 1: Fréquence cardiaque (0-40 points)
         stressPoints += when {
-            avgHeartRate > 90 -> 40  // Très élevé
-            avgHeartRate > 80 -> 25  // Élevé
-            avgHeartRate > 70 -> 10  // Modéré
-            else -> 0                // Normal
+            avgHeartRate > 90 -> 40
+            avgHeartRate > 80 -> 25
+            avgHeartRate > 70 -> 10
+            else -> 0
         }
 
-        // Facteur 2: Sommeil (0-30 points)
         stressPoints += when {
-            sleepHours < 5 -> 30     // Très mauvais
-            sleepHours < 6 -> 20     // Mauvais
-            sleepHours < 7 -> 10     // Insuffisant
-            else -> 0                // Normal
+            sleepHours < 5 -> 30
+            sleepHours < 6 -> 20
+            sleepHours < 7 -> 10
+            else -> 0
         }
 
-        // Facteur 3: Activité physique (0-30 points)
         stressPoints += when {
-            steps < 2000 -> 30       // Très sédentaire
-            steps < 5000 -> 15       // Sédentaire
-            steps < 8000 -> 5        // Actif modéré
-            else -> 0                // Actif
+            steps < 2000 -> 30
+            steps < 5000 -> 15
+            steps < 8000 -> 5
+            else -> 0
         }
 
-        // Classification finale
         return when {
             stressPoints >= 60 -> "Très élevé"
             stressPoints >= 40 -> "Élevé"

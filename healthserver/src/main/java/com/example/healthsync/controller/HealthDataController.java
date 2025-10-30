@@ -86,7 +86,7 @@ public class HealthDataController {
                     totalDataPoints++;
                 }
 
-                // 🏋️ EXERCISE (DÉTAILLÉ)
+                // 🏋️ EXERCISE (COMPLET AVEC TOUTES LES MÉTRIQUES)
                 JsonNode exerciseArray = day.get("exercise");
                 if (exerciseArray != null && exerciseArray.isArray() && exerciseArray.size() > 0) {
                     System.out.println("\n🏋️  EXERCICES (" + exerciseArray.size() + " sessions):");
@@ -99,31 +99,71 @@ public class HealthDataController {
                         System.out.println("   │ ⏱️  Durée: " + ex.get("durationMinutes").asInt() + " minutes");
                         System.out.println("   │ 🕐 Début: " + ex.get("startTime").asText());
 
+                        // Distance
+                        if (ex.has("distanceKm") && !ex.get("distanceKm").asText().equals("0.00")) {
+                            System.out.println("   │ 📏 Distance: " + ex.get("distanceKm").asText() + " km");
+                        }
+
+                        // Pas
                         if (ex.has("steps") && ex.get("steps").asInt() > 0) {
                             System.out.println("   │ 👣 Pas: " + ex.get("steps").asInt());
                         }
 
-                        if (ex.has("calories") && ex.get("calories").asInt() > 0) {
-                            System.out.println("   │ 🔥 Calories: " + ex.get("calories").asInt() + " kcal");
+                        // Calories actives et totales
+                        if (ex.has("activeCalories") && ex.get("activeCalories").asInt() > 0) {
+                            System.out.println("   │ 🔥 Calories actives: " + ex.get("activeCalories").asInt() + " kcal");
+                        }
+                        if (ex.has("totalCalories") && ex.get("totalCalories").asInt() > 0) {
+                            System.out.println("   │ 🔥 Calories totales: " + ex.get("totalCalories").asInt() + " kcal");
                         }
 
+                        // Fréquence cardiaque
                         if (ex.has("avgHeartRate") && ex.get("avgHeartRate").asInt() > 0) {
                             System.out.println("   │ ❤️  BPM moyen: " + ex.get("avgHeartRate").asInt() + " bpm");
+                            if (ex.has("minHeartRate")) {
+                                System.out.println("   │ 💚 BPM min: " + ex.get("minHeartRate").asInt() + " bpm");
+                            }
                             if (ex.has("maxHeartRate")) {
                                 System.out.println("   │ 💓 BPM max: " + ex.get("maxHeartRate").asInt() + " bpm");
                             }
                         }
 
+                        // Cadence (COMPLET)
                         if (ex.has("avgCadence") && ex.get("avgCadence").asInt() > 0) {
-                            System.out.println("   │ 🎵 Cadence: " + ex.get("avgCadence").asInt() + " pas/min");
+                            System.out.println("   │ 🎵 Cadence moyenne: " + ex.get("avgCadence").asInt() + " pas/min");
+                            if (ex.has("minCadence") && ex.get("minCadence").asInt() > 0) {
+                                System.out.println("   │    ↳ Min: " + ex.get("minCadence").asInt() + " pas/min");
+                            }
+                            if (ex.has("maxCadence") && ex.get("maxCadence").asInt() > 0) {
+                                System.out.println("   │    ↳ Max: " + ex.get("maxCadence").asInt() + " pas/min");
+                            }
                         }
 
+                        // Vitesse (COMPLET)
                         if (ex.has("avgSpeedKmh")) {
-                            System.out.println("   │ 🏃 Vitesse: " + ex.get("avgSpeedKmh").asText() + " km/h");
+                            System.out.println("   │ 🏃 Vitesse moyenne: " + ex.get("avgSpeedKmh").asText() + " km/h");
+                            if (ex.has("minSpeedKmh")) {
+                                System.out.println("   │    ↳ Min: " + ex.get("minSpeedKmh").asText() + " km/h");
+                            }
+                            if (ex.has("maxSpeedKmh")) {
+                                System.out.println("   │    ↳ Max: " + ex.get("maxSpeedKmh").asText() + " km/h");
+                            }
                         }
 
+                        // Longueur de foulée (COMPLET)
                         if (ex.has("avgStrideLengthMeters")) {
-                            System.out.println("   │ 👟 Foulée: " + ex.get("avgStrideLengthMeters").asText() + " m");
+                            System.out.println("   │ 👟 Foulée moyenne: " + ex.get("avgStrideLengthMeters").asText() + " m");
+                            if (ex.has("minStrideLengthMeters")) {
+                                System.out.println("   │    ↳ Min: " + ex.get("minStrideLengthMeters").asText() + " m");
+                            }
+                            if (ex.has("maxStrideLengthMeters")) {
+                                System.out.println("   │    ↳ Max: " + ex.get("maxStrideLengthMeters").asText() + " m");
+                            }
+                        }
+
+                        // Puissance (pour cyclisme)
+                        if (ex.has("avgPowerWatts") && ex.get("avgPowerWatts").asInt() > 0) {
+                            System.out.println("   │ ⚡ Puissance: " + ex.get("avgPowerWatts").asInt() + " W");
                         }
 
                         System.out.println("   └────────────────────────────────────────────");
@@ -193,6 +233,22 @@ public class HealthDataController {
                     totalDataPoints += heightArray.size();
                 }
 
+                // 💧 HYDRATATION (NOUVELLE)
+                JsonNode hydrationArray = day.get("hydration");
+                if (hydrationArray != null && hydrationArray.isArray() && hydrationArray.size() > 0) {
+                    String totalHydration = day.has("totalHydrationLiters") ?
+                            day.get("totalHydrationLiters").asText() : "0.00";
+                    System.out.println("\n💧 HYDRATATION: " + totalHydration + " litres (" +
+                            hydrationArray.size() + " prises)");
+
+                    for (int i = 0; i < Math.min(5, hydrationArray.size()); i++) {
+                        JsonNode h = hydrationArray.get(i);
+                        System.out.println("   • " + String.format("%.0f", h.get("volumeMl").asDouble()) +
+                                " ml | " + h.get("time").asText());
+                    }
+                    totalDataPoints += hydrationArray.size();
+                }
+
                 // 🧠 STRESS LEVEL
                 if (day.has("stressLevel")) {
                     String stressLevel = day.get("stressLevel").asText();
@@ -216,8 +272,9 @@ public class HealthDataController {
             System.out.println("║  ✅ SUCCÈS - " + totalDataPoints + " points de données reçus             ║");
             System.out.println("╚═════════════════════════════════════════════════════════════╝\n");
 
-            // TODO: Sauvegarder dans MySQL (healthsync_db)
-            // TODO: Générer des graphiques et statistiques
+            // TODO: Sauvegarder dans MongoDB (biometric_data collection)
+            // TODO: Générer des alertes avec AI (anomaly detection)
+            // TODO: Calculer les tendances et patterns (LSTM/Time Series)
 
             return ResponseEntity.ok("✅ " + totalDataPoints + " données reçues et traitées avec succès!");
 

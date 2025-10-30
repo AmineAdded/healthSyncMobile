@@ -29,6 +29,8 @@ public class HealthData {
         private List<BloodPressureRecord> bloodPressure;
         private List<WeightRecord> weight;
         private List<HeightRecord> height;
+        private List<HydrationRecord> hydration;
+        private String totalHydrationLiters;
         private String stressLevel;
         private Integer stressScore;
     }
@@ -70,13 +72,38 @@ public class HealthData {
         private String startTime;
         private String endTime;
         private Long durationMinutes;
+
+        // Métriques de performance
         private Long steps;
-        private Integer calories;
+        private Double distanceMeters;
+        private String distanceKm;
+
+        // Calories
+        private Integer activeCalories;
+        private Integer totalCalories;
+
+        // Fréquence cardiaque
         private Integer avgHeartRate;
+        private Integer minHeartRate;
         private Integer maxHeartRate;
+
+        // Cadence et allure (COMPLET: min/max/avg)
         private Integer avgCadence;
+        private Integer minCadence;
+        private Integer maxCadence;
+
+        // Vitesse (COMPLET: min/max/avg)
         private String avgSpeedKmh;
+        private String maxSpeedKmh;
+        private String minSpeedKmh;
+
+        // Longueur de foulée (COMPLET: min/max/avg)
         private String avgStrideLengthMeters;
+        private String minStrideLengthMeters;
+        private String maxStrideLengthMeters;
+
+        // Puissance (cyclisme)
+        private Integer avgPowerWatts;
     }
 
     @Data
@@ -107,6 +134,12 @@ public class HealthData {
     @Data
     public static class HeightRecord {
         private Double height;
+        private String time;
+    }
+
+    @Data
+    public static class HydrationRecord {
+        private Double volumeMl;
         private String time;
     }
 }

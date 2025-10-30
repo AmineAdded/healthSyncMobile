@@ -21,6 +21,9 @@
     <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
     <uses-permission android:name="android.permission.health.READ_POWER" />
 
+    <!-- ✅ NOUVELLE: Permission Hydratation -->
+    <uses-permission android:name="android.permission.health.READ_HYDRATION" />
+
     <!-- Permission Internet -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
