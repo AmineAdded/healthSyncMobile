@@ -1,11 +1,16 @@
 package com.example.healthsync
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
 import androidx.health.connect.client.request.ReadRecordsRequest
@@ -20,30 +25,29 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var healthConnectClient: HealthConnectClient
+    private lateinit var requestPermissions: ActivityResultLauncher<Set<String>>
+
+    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+        .withZone(ZoneId.systemDefault())
 
     private val permissions = setOf(
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getReadPermission(HeartRateRecord::class),
         HealthPermission.getReadPermission(DistanceRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
-        HealthPermission.getReadPermission(ExerciseSessionRecord::class)
+        HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+        HealthPermission.getReadPermission(OxygenSaturationRecord::class),
+        HealthPermission.getReadPermission(BodyTemperatureRecord::class),
+        HealthPermission.getReadPermission(BloodPressureRecord::class),
+        HealthPermission.getReadPermission(WeightRecord::class),
+        HealthPermission.getReadPermission(HeightRecord::class)
     )
-
-    private val requestPermissions =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
-            lifecycleScope.launch {
-                if (grants.values.all { it }) {
-                    Toast.makeText(this@MainActivity, "Permissions accordées", Toast.LENGTH_SHORT).show()
-                    readAndSendData()
-                } else {
-                    Toast.makeText(this@MainActivity, "Permissions refusées", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,12 +93,39 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        // ✅ Contract pour Health Connect avec types explicites
+        val requestPermissionActivityContract = PermissionController.createRequestPermissionResultContract()
+
+        requestPermissions = registerForActivityResult(requestPermissionActivityContract) { grantedPermissions: Set<String> ->
+            lifecycleScope.launch {
+                if (grantedPermissions.containsAll(permissions)) {
+                    Toast.makeText(this@MainActivity, "✅ Toutes les permissions accordées", Toast.LENGTH_SHORT).show()
+                    readAndSendData()
+                } else {
+                    val missingPermissions = permissions - grantedPermissions
+                    val missingCount = missingPermissions.size
+                    val missingList = missingPermissions.take(3).joinToString("\n") { permission ->
+                        permission.substringAfterLast(".")
+                    }
+                    Toast.makeText(
+                        this@MainActivity,
+                        "❌ $missingCount permission(s) refusée(s)\n$missingList",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+
+        checkPermissions()
+    }
+
+    private fun checkPermissions() {
         lifecycleScope.launch {
             try {
-                val granted = healthConnectClient.permissionController.getGrantedPermissions()
+                val grantedPermissions = healthConnectClient.permissionController.getGrantedPermissions()
 
-                if (!granted.containsAll(permissions)) {
-                    requestPermissions.launch(permissions.toTypedArray())
+                if (!grantedPermissions.containsAll(permissions)) {
+                    requestPermissions.launch(permissions)
                 } else {
                     readAndSendData()
                 }
@@ -109,10 +140,12 @@ class MainActivity : ComponentActivity() {
             try {
                 val json = JSONObject()
                 val endTime = Instant.now()
-                val startTime = endTime.minusSeconds(30L * 24 * 3600)
+                val startTime = endTime.minusSeconds( 24 * 3600) // 1 jour
                 val timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
 
-                // Steps
+                Toast.makeText(this@MainActivity, "🔄 Lecture des données Health Connect...", Toast.LENGTH_SHORT).show()
+
+                // 1️⃣ Steps
                 val stepsRecords = healthConnectClient.readRecords(
                     ReadRecordsRequest(StepsRecord::class, timeRangeFilter)
                 )
@@ -122,13 +155,13 @@ class MainActivity : ComponentActivity() {
                     totalSteps += record.count
                     val obj = JSONObject()
                     obj.put("count", record.count)
-                    obj.put("startTime", record.startTime.toString())
-                    obj.put("endTime", record.endTime.toString())
+                    obj.put("startTime", dateFormatter.format(record.startTime))
+                    obj.put("endTime", dateFormatter.format(record.endTime))
                     stepsArray.put(obj)
                 }
                 json.put("steps", stepsArray)
 
-                // Heart rate
+                // 2️⃣ Heart Rate
                 val hrRecords = healthConnectClient.readRecords(
                     ReadRecordsRequest(HeartRateRecord::class, timeRangeFilter)
                 )
@@ -136,13 +169,13 @@ class MainActivity : ComponentActivity() {
                 for (record in hrRecords.records) {
                     val obj = JSONObject()
                     obj.put("samples", JSONArray(record.samples.map { it.beatsPerMinute }))
-                    obj.put("startTime", record.startTime.toString())
-                    obj.put("endTime", record.endTime.toString())
+                    obj.put("startTime", dateFormatter.format(record.startTime))
+                    obj.put("endTime", dateFormatter.format(record.endTime))
                     hrArray.put(obj)
                 }
                 json.put("heartRate", hrArray)
 
-                // Distance
+                // 3️⃣ Distance
                 val distRecords = healthConnectClient.readRecords(
                     ReadRecordsRequest(DistanceRecord::class, timeRangeFilter)
                 )
@@ -152,13 +185,13 @@ class MainActivity : ComponentActivity() {
                     totalDistance += record.distance.inMeters
                     val obj = JSONObject()
                     obj.put("distanceMeters", record.distance.inMeters)
-                    obj.put("startTime", record.startTime.toString())
-                    obj.put("endTime", record.endTime.toString())
+                    obj.put("startTime", dateFormatter.format(record.startTime))
+                    obj.put("endTime", dateFormatter.format(record.endTime))
                     distArray.put(obj)
                 }
                 json.put("distance", distArray)
 
-                // Sleep
+                // 4️⃣ Sleep
                 val sleepRecords = healthConnectClient.readRecords(
                     ReadRecordsRequest(SleepSessionRecord::class, timeRangeFilter)
                 )
@@ -166,13 +199,13 @@ class MainActivity : ComponentActivity() {
                 for (record in sleepRecords.records) {
                     val obj = JSONObject()
                     obj.put("title", record.title ?: "Sommeil")
-                    obj.put("startTime", record.startTime.toString())
-                    obj.put("endTime", record.endTime.toString())
+                    obj.put("startTime", dateFormatter.format(record.startTime))
+                    obj.put("endTime", dateFormatter.format(record.endTime))
                     sleepArray.put(obj)
                 }
                 json.put("sleep", sleepArray)
 
-                // Exercise
+                // 5️⃣ Exercise
                 val exerciseRecords = healthConnectClient.readRecords(
                     ReadRecordsRequest(ExerciseSessionRecord::class, timeRangeFilter)
                 )
@@ -181,41 +214,139 @@ class MainActivity : ComponentActivity() {
                     val obj = JSONObject()
                     obj.put("title", record.title ?: "Exercice")
                     obj.put("exerciseType", record.exerciseType)
-                    obj.put("startTime", record.startTime.toString())
-                    obj.put("endTime", record.endTime.toString())
+                    obj.put("startTime", dateFormatter.format(record.startTime))
+                    obj.put("endTime", dateFormatter.format(record.endTime))
                     exerciseArray.put(obj)
                 }
                 json.put("exercise", exerciseArray)
 
+                // 6️⃣ Oxygen Saturation 🫁
+                val oxygenRecords = healthConnectClient.readRecords(
+                    ReadRecordsRequest(OxygenSaturationRecord::class, timeRangeFilter)
+                )
+                val oxygenArray = JSONArray()
+                for (record in oxygenRecords.records) {
+                    val obj = JSONObject()
+                    obj.put("percentage", record.percentage.value)
+                    obj.put("time", dateFormatter.format(record.time))
+                    oxygenArray.put(obj)
+                }
+                json.put("oxygenSaturation", oxygenArray)
+
+                // 7️⃣ Body Temperature 🌡️
+                val tempRecords = healthConnectClient.readRecords(
+                    ReadRecordsRequest(BodyTemperatureRecord::class, timeRangeFilter)
+                )
+                val tempArray = JSONArray()
+                for (record in tempRecords.records) {
+                    val obj = JSONObject()
+                    obj.put("temperature", record.temperature.inCelsius)
+                    obj.put("time", dateFormatter.format(record.time))
+                    tempArray.put(obj)
+                }
+                json.put("bodyTemperature", tempArray)
+
+                // 8️⃣ Blood Pressure 💉
+                val bpRecords = healthConnectClient.readRecords(
+                    ReadRecordsRequest(BloodPressureRecord::class, timeRangeFilter)
+                )
+                val bpArray = JSONArray()
+                for (record in bpRecords.records) {
+                    val obj = JSONObject()
+                    obj.put("systolic", record.systolic.inMillimetersOfMercury)
+                    obj.put("diastolic", record.diastolic.inMillimetersOfMercury)
+                    obj.put("time", dateFormatter.format(record.time))
+                    bpArray.put(obj)
+                }
+                json.put("bloodPressure", bpArray)
+
+                // 9️⃣ Weight ⚖️
+                val weightRecords = healthConnectClient.readRecords(
+                    ReadRecordsRequest(WeightRecord::class, timeRangeFilter)
+                )
+                val weightArray = JSONArray()
+                for (record in weightRecords.records) {
+                    val obj = JSONObject()
+                    obj.put("weight", record.weight.inKilograms)
+                    obj.put("time", dateFormatter.format(record.time))
+                    weightArray.put(obj)
+                }
+                json.put("weight", weightArray)
+
+                // 🔟 Height 📏
+                val heightRecords = healthConnectClient.readRecords(
+                    ReadRecordsRequest(HeightRecord::class, timeRangeFilter)
+                )
+                val heightArray = JSONArray()
+                for (record in heightRecords.records) {
+                    val obj = JSONObject()
+                    obj.put("height", record.height.inMeters)
+                    obj.put("time", dateFormatter.format(record.time))
+                    heightArray.put(obj)
+                }
+                json.put("height", heightArray)
+
+                // Résumé
                 val summary = """
-                    Données collectées:
-                    ${sleepRecords.records.size} sessions sommeil
-                    $totalSteps pas
-                    ${String.format("%.2f", totalDistance/1000)} km
-                    ${hrRecords.records.size} mesures cardio
-                    ${exerciseRecords.records.size} exercices
+                    📊 Données collectées:
+                    🏋️ ${exerciseRecords.records.size} exercices
+                     💤 ${sleepRecords.records.size} sessions sommeil
+                    👣 ${stepsRecords.records.size} pas (Total: $totalSteps)
+                    ❤️ ${hrRecords.records.size} mesures cardio
+                    📏 ${distRecords.records.size} distances (${String.format("%.2f", totalDistance/1000)} km)
+                    🫁 ${oxygenRecords.records.size} saturations O2
+                    🌡️ ${tempRecords.records.size} températures
+                    💉 ${bpRecords.records.size} pressions artérielles
+                    ⚖️ ${weightRecords.records.size} poids
+                    📏 ${heightRecords.records.size} tailles
                 """.trimIndent()
 
                 Toast.makeText(this@MainActivity, summary, Toast.LENGTH_LONG).show()
                 sendToServer(json.toString())
 
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Erreur lecture: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "❌ Erreur lecture: ${e.message}", Toast.LENGTH_LONG).show()
+                e.printStackTrace()
             }
         }
     }
 
+
     private fun sendToServer(jsonData: String) {
         lifecycleScope.launch {
             try {
+                Toast.makeText(this@MainActivity, "🔄 Connexion au serveur...", Toast.LENGTH_SHORT).show()
+
                 val result = withContext(Dispatchers.IO) {
-                    //URL d'adresse IP de mon pc
-                    val serverUrl = "http://192.168.1.12:9090/fetch"
+                    val serverUrl = "https://pleuropneumonic-ferromagnetic-conrad.ngrok-free.dev/fetch"
+
+                    // Affichage via Toast sur le thread principal
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "📡 Tentative de connexion à: $serverUrl", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "📦 Taille des données: ${jsonData.length} caractères", Toast.LENGTH_SHORT).show()
+                    }
 
                     val client = OkHttpClient.Builder()
-                        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                        .writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .addInterceptor { chain ->
+                            val request = chain.request()
+
+                            // Affiche le toast depuis le thread principal
+                            Handler(Looper.getMainLooper()).post {
+                                Toast.makeText(this@MainActivity, "🚀 Envoi de la requête...", Toast.LENGTH_SHORT).show()
+                            }
+
+                            val response = chain.proceed(request)
+
+                            Handler(Looper.getMainLooper()).post {
+                                Toast.makeText(this@MainActivity, "✅ Réponse reçue: ${response.code}", Toast.LENGTH_SHORT).show()
+                            }
+
+                            response
+                        }
+
                         .build()
 
                     val requestBody = jsonData.toRequestBody("application/json".toMediaType())
@@ -224,6 +355,10 @@ class MainActivity : ComponentActivity() {
                         .post(requestBody)
                         .addHeader("Content-Type", "application/json")
                         .build()
+
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "⏳ Attente de la réponse...", Toast.LENGTH_SHORT).show()
+                    }
 
                     val response = client.newCall(request).execute()
                     val responseCode = response.code
@@ -236,24 +371,16 @@ class MainActivity : ComponentActivity() {
                 val (responseCode, responseBody) = result
 
                 if (responseCode in 200..299) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Données envoyées avec succès",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@MainActivity, "✅ Succès HTTP $responseCode : $responseBody", Toast.LENGTH_LONG).show()
                 } else {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Erreur HTTP: $responseCode",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this@MainActivity, "❌ Erreur HTTP $responseCode : $responseBody", Toast.LENGTH_LONG).show()
                 }
 
             } catch (e: java.net.ConnectException) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@MainActivity,
-                        "Connexion refusée.\nVérifiez que le serveur est démarré",
+                        "❌ Connexion refusée.\nVérifiez que le serveur est sur 192.168.1.12:9090",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -262,7 +389,7 @@ class MainActivity : ComponentActivity() {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@MainActivity,
-                        "Timeout: le serveur ne répond pas",
+                        "⏱️ Timeout après 30s.\nLe serveur met trop de temps à répondre",
                         Toast.LENGTH_LONG
                     ).show()
                 }
@@ -271,20 +398,22 @@ class MainActivity : ComponentActivity() {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@MainActivity,
-                        "Impossible de trouver le serveur",
+                        "🌐 Impossible de trouver 192.168.1.12\nVérifiez votre WiFi",
                         Toast.LENGTH_LONG
                     ).show()
                 }
 
             } catch (e: Exception) {
+                e.printStackTrace()
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@MainActivity,
-                        "Erreur: ${e.message ?: "Erreur inconnue"}",
+                        "❌ Erreur: ${e.javaClass.simpleName}\n${e.message}",
                         Toast.LENGTH_LONG
                     ).show()
                 }
             }
         }
     }
+
 }
