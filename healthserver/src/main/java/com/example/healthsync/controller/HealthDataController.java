@@ -1,6 +1,7 @@
 package com.example.healthsync.controller;
 
-import com.example.healthsync.model.HealthData;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -10,182 +11,210 @@ import org.springframework.http.HttpStatus;
 @CrossOrigin(origins = "*")
 public class HealthDataController {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @GetMapping
     public ResponseEntity<String> testConnection() {
         return ResponseEntity.ok("✅ Serveur Spring Boot accessible depuis le téléphone!");
     }
+
     @PostMapping
-    public ResponseEntity<String> receiveHealthData(@RequestBody HealthData healthData) {
+    public ResponseEntity<String> receiveHealthData(@RequestBody String rawJson) {
         try {
-            System.out.println("\n╔════════════════════════════════════════════════════════╗");
-            System.out.println("║  🔔 DONNÉES HEALTH CONNECT REÇUES DEPUIS ANDROID     ║");
-            System.out.println("╚════════════════════════════════════════════════════════╝\n");
+            System.out.println("\n╔═════════════════════════════════════════════════════════════╗");
+            System.out.println("║  🔔 DONNÉES HEALTH CONNECT REÇUES DEPUIS ANDROID          ║");
+            System.out.println("╚═════════════════════════════════════════════════════════════╝\n");
+
+            JsonNode root = objectMapper.readTree(rawJson);
+            JsonNode dailyData = root.get("dailyData");
+
+            if (dailyData == null || !dailyData.isArray()) {
+                return ResponseEntity.badRequest().body("❌ Format de données invalide");
+            }
 
             int totalDataPoints = 0;
 
-            // 👣 Steps
-            if (healthData.getSteps() != null && !healthData.getSteps().isEmpty()) {
-                int count = healthData.getSteps().size();
-                totalDataPoints += count;
-                long totalSteps = healthData.getSteps().stream()
-                        .mapToLong(HealthData.StepRecord::getCount)
-                        .sum();
+            for (JsonNode day : dailyData) {
+                String date = day.get("date").asText();
 
-                System.out.println("👣 STEPS (" + count + " entrées):");
-                System.out.println("   Total: " + totalSteps + " pas");
+                System.out.println("\n╭─────────────────────────────────────────────────────────────╮");
+                System.out.println("│  📅 DATE: " + date + "                                   │");
+                System.out.println("╰─────────────────────────────────────────────────────────────╯\n");
 
-                // Afficher les 3 dernières entrées
-                healthData.getSteps().stream()
-                        .limit(3)
-                        .forEach(step ->
-                                System.out.println("   • " + step.getCount() + " pas | " + step.getStartTime())
-                        );
-                System.out.println();
-            }
+                // 👣 STEPS
+                int totalSteps = day.has("totalSteps") ? day.get("totalSteps").asInt() : 0;
+                if (totalSteps > 0) {
+                    System.out.println("👣 STEPS: " + totalSteps + " pas");
+                    totalDataPoints++;
+                }
 
-            // ❤️ Heart Rate
-            if (healthData.getHeartRate() != null && !healthData.getHeartRate().isEmpty()) {
-                int count = healthData.getHeartRate().size();
-                totalDataPoints += count;
+                // ❤️ HEART RATE
+                if (day.has("avgHeartRate")) {
+                    int avgHR = day.get("avgHeartRate").asInt();
+                    int minHR = day.has("minHeartRate") ? day.get("minHeartRate").asInt() : 0;
+                    int maxHR = day.has("maxHeartRate") ? day.get("maxHeartRate").asInt() : 0;
 
-                System.out.println("❤️ HEART RATE (" + count + " entrées):");
+                    System.out.println("❤️  HEART RATE:");
+                    System.out.println("   • Moyenne: " + avgHR + " bpm");
+                    System.out.println("   • Min: " + minHR + " bpm | Max: " + maxHR + " bpm");
+                    totalDataPoints++;
+                }
 
-                healthData.getHeartRate().stream()
-                        .limit(3)
-                        .forEach(hr -> {
-                            if (hr.getSamples() != null && !hr.getSamples().isEmpty()) {
-                                double avg = hr.getSamples().stream()
-                                        .mapToDouble(Double::doubleValue)
-                                        .average()
-                                        .orElse(0.0);
-                                System.out.println("   • Moyenne: " + String.format("%.1f", avg) + " bpm | " + hr.getStartTime());
+                // 📏 DISTANCE
+                if (day.has("totalDistanceKm")) {
+                    String distKm = day.get("totalDistanceKm").asText();
+                    System.out.println("📏 DISTANCE: " + distKm + " km");
+                    totalDataPoints++;
+                }
+
+                // 💤 SLEEP
+                if (day.has("totalSleepHours")) {
+                    String sleepHours = day.get("totalSleepHours").asText();
+                    System.out.println("💤 SOMMEIL: " + sleepHours + " heures");
+
+                    JsonNode sleepArray = day.get("sleep");
+                    if (sleepArray != null && sleepArray.isArray()) {
+                        for (JsonNode sleep : sleepArray) {
+                            String title = sleep.get("title").asText();
+                            String start = sleep.get("startTime").asText();
+                            String end = sleep.get("endTime").asText();
+                            int duration = sleep.get("durationMinutes").asInt();
+                            System.out.println("   • " + title + ": " + start + " → " + end +
+                                    " (" + duration + " min)");
+                        }
+                    }
+                    totalDataPoints++;
+                }
+
+                // 🏋️ EXERCISE (DÉTAILLÉ)
+                JsonNode exerciseArray = day.get("exercise");
+                if (exerciseArray != null && exerciseArray.isArray() && exerciseArray.size() > 0) {
+                    System.out.println("\n🏋️  EXERCICES (" + exerciseArray.size() + " sessions):");
+
+                    for (int i = 0; i < exerciseArray.size(); i++) {
+                        JsonNode ex = exerciseArray.get(i);
+
+                        System.out.println("\n   ┌─ Session " + (i + 1) + " ─────────────────────────────");
+                        System.out.println("   │ 🏃 Type: " + ex.get("exerciseTypeName").asText());
+                        System.out.println("   │ ⏱️  Durée: " + ex.get("durationMinutes").asInt() + " minutes");
+                        System.out.println("   │ 🕐 Début: " + ex.get("startTime").asText());
+
+                        if (ex.has("steps") && ex.get("steps").asInt() > 0) {
+                            System.out.println("   │ 👣 Pas: " + ex.get("steps").asInt());
+                        }
+
+                        if (ex.has("calories") && ex.get("calories").asInt() > 0) {
+                            System.out.println("   │ 🔥 Calories: " + ex.get("calories").asInt() + " kcal");
+                        }
+
+                        if (ex.has("avgHeartRate") && ex.get("avgHeartRate").asInt() > 0) {
+                            System.out.println("   │ ❤️  BPM moyen: " + ex.get("avgHeartRate").asInt() + " bpm");
+                            if (ex.has("maxHeartRate")) {
+                                System.out.println("   │ 💓 BPM max: " + ex.get("maxHeartRate").asInt() + " bpm");
                             }
-                        });
-                System.out.println();
+                        }
+
+                        if (ex.has("avgCadence") && ex.get("avgCadence").asInt() > 0) {
+                            System.out.println("   │ 🎵 Cadence: " + ex.get("avgCadence").asInt() + " pas/min");
+                        }
+
+                        if (ex.has("avgSpeedKmh")) {
+                            System.out.println("   │ 🏃 Vitesse: " + ex.get("avgSpeedKmh").asText() + " km/h");
+                        }
+
+                        if (ex.has("avgStrideLengthMeters")) {
+                            System.out.println("   │ 👟 Foulée: " + ex.get("avgStrideLengthMeters").asText() + " m");
+                        }
+
+                        System.out.println("   └────────────────────────────────────────────");
+                    }
+                    totalDataPoints += exerciseArray.size();
+                }
+
+                // 🫁 OXYGEN SATURATION
+                JsonNode oxygenArray = day.get("oxygenSaturation");
+                if (oxygenArray != null && oxygenArray.isArray() && oxygenArray.size() > 0) {
+                    System.out.println("\n🫁 SATURATION O2 (" + oxygenArray.size() + " mesures):");
+                    for (int i = 0; i < Math.min(3, oxygenArray.size()); i++) {
+                        JsonNode o2 = oxygenArray.get(i);
+                        System.out.println("   • " + String.format("%.1f", o2.get("percentage").asDouble()) +
+                                "% | " + o2.get("time").asText());
+                    }
+                    totalDataPoints += oxygenArray.size();
+                }
+
+                // 🌡️ TEMPERATURE
+                JsonNode tempArray = day.get("bodyTemperature");
+                if (tempArray != null && tempArray.isArray() && tempArray.size() > 0) {
+                    System.out.println("\n🌡️  TEMPÉRATURE (" + tempArray.size() + " mesures):");
+                    for (int i = 0; i < Math.min(3, tempArray.size()); i++) {
+                        JsonNode temp = tempArray.get(i);
+                        System.out.println("   • " + String.format("%.1f", temp.get("temperature").asDouble()) +
+                                "°C | " + temp.get("time").asText());
+                    }
+                    totalDataPoints += tempArray.size();
+                }
+
+                // 💉 BLOOD PRESSURE
+                JsonNode bpArray = day.get("bloodPressure");
+                if (bpArray != null && bpArray.isArray() && bpArray.size() > 0) {
+                    System.out.println("\n💉 PRESSION ARTÉRIELLE (" + bpArray.size() + " mesures):");
+                    for (int i = 0; i < Math.min(3, bpArray.size()); i++) {
+                        JsonNode bp = bpArray.get(i);
+                        System.out.println("   • " +
+                                String.format("%.0f", bp.get("systolic").asDouble()) + "/" +
+                                String.format("%.0f", bp.get("diastolic").asDouble()) +
+                                " mmHg | " + bp.get("time").asText());
+                    }
+                    totalDataPoints += bpArray.size();
+                }
+
+                // ⚖️ WEIGHT
+                JsonNode weightArray = day.get("weight");
+                if (weightArray != null && weightArray.isArray() && weightArray.size() > 0) {
+                    System.out.println("\n⚖️  POIDS (" + weightArray.size() + " mesures):");
+                    for (int i = 0; i < Math.min(3, weightArray.size()); i++) {
+                        JsonNode w = weightArray.get(i);
+                        System.out.println("   • " + String.format("%.1f", w.get("weight").asDouble()) +
+                                " kg | " + w.get("time").asText());
+                    }
+                    totalDataPoints += weightArray.size();
+                }
+
+                // 📏 HEIGHT
+                JsonNode heightArray = day.get("height");
+                if (heightArray != null && heightArray.isArray() && heightArray.size() > 0) {
+                    System.out.println("\n📏 TAILLE (" + heightArray.size() + " mesures):");
+                    for (int i = 0; i < Math.min(3, heightArray.size()); i++) {
+                        JsonNode h = heightArray.get(i);
+                        System.out.println("   • " + String.format("%.2f", h.get("height").asDouble()) +
+                                " m | " + h.get("time").asText());
+                    }
+                    totalDataPoints += heightArray.size();
+                }
+
+                // 🧠 STRESS LEVEL
+                if (day.has("stressLevel")) {
+                    String stressLevel = day.get("stressLevel").asText();
+                    int stressScore = day.get("stressScore").asInt();
+
+                    String stressEmoji = switch (stressLevel) {
+                        case "Très élevé" -> "🔴";
+                        case "Élevé" -> "🟠";
+                        case "Modéré" -> "🟡";
+                        default -> "🟢";
+                    };
+
+                    System.out.println("\n🧠 NIVEAU DE STRESS: " + stressEmoji + " " + stressLevel +
+                            " (" + stressScore + "/100)");
+                }
+
+                System.out.println("\n" + "─".repeat(65));
             }
 
-            // 📏 Distance
-            if (healthData.getDistance() != null && !healthData.getDistance().isEmpty()) {
-                int count = healthData.getDistance().size();
-                totalDataPoints += count;
-                double totalKm = healthData.getDistance().stream()
-                        .mapToDouble(HealthData.DistanceRecord::getDistanceMeters)
-                        .sum() / 1000.0;
-
-                System.out.println("📏 DISTANCE (" + count + " entrées):");
-                System.out.println("   Total: " + String.format("%.2f", totalKm) + " km");
-                System.out.println();
-            }
-
-            // 💤 Sleep
-            if (healthData.getSleep() != null && !healthData.getSleep().isEmpty()) {
-                int count = healthData.getSleep().size();
-                totalDataPoints += count;
-
-                System.out.println("💤 SLEEP (" + count + " sessions):");
-                healthData.getSleep().stream()
-                        .limit(3)
-                        .forEach(sleep ->
-                                System.out.println("   • " + sleep.getTitle() + " | " +
-                                        sleep.getStartTime() + " → " + sleep.getEndTime())
-                        );
-                System.out.println();
-            }
-
-            // 🏋️ Exercise
-            if (healthData.getExercise() != null && !healthData.getExercise().isEmpty()) {
-                int count = healthData.getExercise().size();
-                totalDataPoints += count;
-
-                System.out.println("🏋️ EXERCISE (" + count + " sessions):");
-                healthData.getExercise().stream()
-                        .limit(3)
-                        .forEach(ex ->
-                                System.out.println("   • " + ex.getTitle() + " (Type: " + ex.getExerciseType() +
-                                        ") | " + ex.getStartTime())
-                        );
-                System.out.println();
-            }
-
-            // 🫁 Oxygen Saturation
-            if (healthData.getOxygenSaturation() != null && !healthData.getOxygenSaturation().isEmpty()) {
-                int count = healthData.getOxygenSaturation().size();
-                totalDataPoints += count;
-
-                System.out.println("🫁 OXYGEN SATURATION (" + count + " mesures):");
-                healthData.getOxygenSaturation().stream()
-                        .limit(3)
-                        .forEach(o2 ->
-                                System.out.println("   • " + String.format("%.1f", o2.getPercentage()) +
-                                        "% | " + o2.getTime())
-                        );
-                System.out.println();
-            }
-
-            // 🌡️ Body Temperature
-            if (healthData.getBodyTemperature() != null && !healthData.getBodyTemperature().isEmpty()) {
-                int count = healthData.getBodyTemperature().size();
-                totalDataPoints += count;
-
-                System.out.println("🌡️ BODY TEMPERATURE (" + count + " mesures):");
-                healthData.getBodyTemperature().stream()
-                        .limit(3)
-                        .forEach(temp ->
-                                System.out.println("   • " + String.format("%.1f", temp.getTemperature()) +
-                                        "°C | " + temp.getTime())
-                        );
-                System.out.println();
-            }
-
-            // 💉 Blood Pressure
-            if (healthData.getBloodPressure() != null && !healthData.getBloodPressure().isEmpty()) {
-                int count = healthData.getBloodPressure().size();
-                totalDataPoints += count;
-
-                System.out.println("💉 BLOOD PRESSURE (" + count + " mesures):");
-                healthData.getBloodPressure().stream()
-                        .limit(3)
-                        .forEach(bp ->
-                                System.out.println("   • " + String.format("%.0f", bp.getSystolic()) +
-                                        "/" + String.format("%.0f", bp.getDiastolic()) +
-                                        " mmHg | " + bp.getTime())
-                        );
-                System.out.println();
-            }
-
-            // ⚖️ Weight
-            if (healthData.getWeight() != null && !healthData.getWeight().isEmpty()) {
-                int count = healthData.getWeight().size();
-                totalDataPoints += count;
-
-                System.out.println("⚖️ WEIGHT (" + count + " mesures):");
-                healthData.getWeight().stream()
-                        .limit(3)
-                        .forEach(w ->
-                                System.out.println("   • " + String.format("%.1f", w.getWeight()) +
-                                        " kg | " + w.getTime())
-                        );
-                System.out.println();
-            }
-
-            // 📏 Height
-            if (healthData.getHeight() != null && !healthData.getHeight().isEmpty()) {
-                int count = healthData.getHeight().size();
-                totalDataPoints += count;
-
-                System.out.println("📏 HEIGHT (" + count + " mesures):");
-                healthData.getHeight().stream()
-                        .limit(3)
-                        .forEach(h ->
-                                System.out.println("   • " + String.format("%.2f", h.getHeight()) +
-                                        " m | " + h.getTime())
-                        );
-                System.out.println();
-            }
-
-            System.out.println("╔════════════════════════════════════════════════════════╗");
-            System.out.println("║  ✅ SUCCÈS - " + totalDataPoints + " points de données reçus         ║");
-            System.out.println("╚════════════════════════════════════════════════════════╝\n");
+            System.out.println("\n╔═════════════════════════════════════════════════════════════╗");
+            System.out.println("║  ✅ SUCCÈS - " + totalDataPoints + " points de données reçus             ║");
+            System.out.println("╚═════════════════════════════════════════════════════════════╝\n");
 
             // TODO: Sauvegarder dans MySQL (healthsync_db)
             // TODO: Générer des graphiques et statistiques
