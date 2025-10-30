@@ -35,6 +35,23 @@ class MainActivity : ComponentActivity() {
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         .withZone(ZoneId.systemDefault())
 
+    // Views
+    private lateinit var tvStatus: android.widget.TextView
+    private lateinit var tvSteps: android.widget.TextView
+    private lateinit var tvDistance: android.widget.TextView
+    private lateinit var tvHeartRate: android.widget.TextView
+    private lateinit var tvSleep: android.widget.TextView
+    private lateinit var tvHydration: android.widget.TextView
+    private lateinit var tvStress: android.widget.TextView
+    private lateinit var tvExerciseCount: android.widget.TextView
+    private lateinit var exerciseContainer: android.widget.LinearLayout
+    private lateinit var tvSpO2: android.widget.TextView
+    private lateinit var tvTemperature: android.widget.TextView
+    private lateinit var tvBloodPressure: android.widget.TextView
+    private lateinit var tvWeight: android.widget.TextView
+    private lateinit var tvJsonData: android.widget.TextView
+    private lateinit var btnRefresh: android.widget.Button
+
     private val permissions = setOf(
         // Permissions de base
         HealthPermission.getReadPermission(StepsRecord::class),
@@ -59,6 +76,28 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        // Initialiser les vues
+        tvStatus = findViewById(R.id.tvStatus)
+        tvSteps = findViewById(R.id.tvSteps)
+        tvDistance = findViewById(R.id.tvDistance)
+        tvHeartRate = findViewById(R.id.tvHeartRate)
+        tvSleep = findViewById(R.id.tvSleep)
+        tvHydration = findViewById(R.id.tvHydration)
+        tvStress = findViewById(R.id.tvStress)
+        tvExerciseCount = findViewById(R.id.tvExerciseCount)
+        exerciseContainer = findViewById(R.id.exerciseContainer)
+        tvSpO2 = findViewById(R.id.tvSpO2)
+        tvTemperature = findViewById(R.id.tvTemperature)
+        tvBloodPressure = findViewById(R.id.tvBloodPressure)
+        tvWeight = findViewById(R.id.tvWeight)
+        tvJsonData = findViewById(R.id.tvJsonData)
+        btnRefresh = findViewById(R.id.btnRefresh)
+
+        btnRefresh.setOnClickListener {
+            checkPermissions()
+        }
 
         val availabilityStatus = HealthConnectClient.getSdkStatus(this)
 
@@ -630,6 +669,9 @@ class MainActivity : ComponentActivity() {
 
                 json.put("dailyData", daysData)
 
+                // Mettre à jour l'UI avec les données du jour
+                updateUI(daysData.getJSONObject(0))
+
                 Toast.makeText(this@MainActivity, "✅ Données de 7 jours collectées!", Toast.LENGTH_LONG).show()
 
                 Log.d("HealthSync", "JSON à envoyer: $json")
@@ -639,6 +681,93 @@ class MainActivity : ComponentActivity() {
                 Toast.makeText(this@MainActivity, "❌ Erreur lecture: ${e.message}", Toast.LENGTH_LONG).show()
                 e.printStackTrace()
             }
+        }
+    }
+
+    private fun updateUI(dayJson: JSONObject) {
+        try {
+            tvStatus.text = "Données du ${dayJson.getString("date")}"
+
+            // Pas
+            val totalSteps = dayJson.optLong("totalSteps", 0)
+            tvSteps.text = "👣 Pas : $totalSteps"
+
+            // Distance
+            val totalDistanceKm = dayJson.optString("totalDistanceKm", "0.00")
+            tvDistance.text = "📏 Distance : $totalDistanceKm km"
+
+            // Fréquence cardiaque
+            val avgHeartRate = dayJson.optInt("avgHeartRate", 0)
+            tvHeartRate.text = "❤️ BPM moyen : $avgHeartRate"
+
+            // Sommeil
+            val totalSleepHours = dayJson.optString("totalSleepHours", "0.0")
+            tvSleep.text = "😴 Sommeil : $totalSleepHours h"
+
+            // Hydratation
+            val totalHydration = dayJson.optString("totalHydrationLiters", "0.00")
+            tvHydration.text = "💧 Hydratation : $totalHydration L"
+
+            // Stress
+            val stressLevel = dayJson.optString("stressLevel", "Inconnu")
+            val stressScore = dayJson.optInt("stressScore", 0)
+            tvStress.text = "🧠 Stress : $stressLevel ($stressScore)"
+
+            // Exercices
+            val exercises = dayJson.optJSONArray("exercise") ?: JSONArray()
+            tvExerciseCount.text = "🏋️ Exercices : ${exercises.length()}"
+            exerciseContainer.removeAllViews()
+            for (i in 0 until exercises.length()) {
+                val ex = exercises.getJSONObject(i)
+                val textView = android.widget.TextView(this)
+                textView.text =
+                    "- ${ex.optString("exerciseTypeName")} (${ex.optString("durationMinutes")} min, ${ex.optString("distanceKm", "0.00")} km)"
+                exerciseContainer.addView(textView)
+            }
+
+            // SpO2
+            val oxygenArray = dayJson.optJSONArray("oxygenSaturation") ?: JSONArray()
+            if (oxygenArray.length() > 0) {
+                val lastO2 = oxygenArray.getJSONObject(oxygenArray.length() - 1)
+                tvSpO2.text = "🫁 SpO₂ : ${lastO2.optDouble("percentage", 0.0)}%"
+            } else {
+                tvSpO2.text = "🫁 SpO₂ : -"
+            }
+
+            // Température corporelle
+            val tempArray = dayJson.optJSONArray("bodyTemperature") ?: JSONArray()
+            if (tempArray.length() > 0) {
+                val lastTemp = tempArray.getJSONObject(tempArray.length() - 1)
+                tvTemperature.text = "🌡 Température : ${lastTemp.optDouble("temperature", 0.0)} °C"
+            } else {
+                tvTemperature.text = "🌡 Température : -"
+            }
+
+            // Pression artérielle
+            val bpArray = dayJson.optJSONArray("bloodPressure") ?: JSONArray()
+            if (bpArray.length() > 0) {
+                val lastBP = bpArray.getJSONObject(bpArray.length() - 1)
+                tvBloodPressure.text =
+                    "🩸 Tension : ${lastBP.optDouble("systolic", 0.0)}/${lastBP.optDouble("diastolic", 0.0)} mmHg"
+            } else {
+                tvBloodPressure.text = "🩸 Tension : -"
+            }
+
+            // Poids
+            val weightArray = dayJson.optJSONArray("weight") ?: JSONArray()
+            if (weightArray.length() > 0) {
+                val lastWeight = weightArray.getJSONObject(weightArray.length() - 1)
+                tvWeight.text = "⚖️ Poids : ${lastWeight.optDouble("weight", 0.0)} kg"
+            } else {
+                tvWeight.text = "⚖️ Poids : -"
+            }
+
+            // JSON complet (facultatif)
+            tvJsonData.text = dayJson.toString(2)
+
+        } catch (e: Exception) {
+            tvStatus.text = "❌ Erreur mise à jour UI : ${e.message}"
+            e.printStackTrace()
         }
     }
 

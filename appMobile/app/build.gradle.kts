@@ -44,6 +44,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation("androidx.cardview:cardview:1.0.0")
 
     // Health Connect - Version stable
     implementation("androidx.health.connect:connect-client:1.1.0-alpha08")
