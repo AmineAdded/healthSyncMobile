@@ -3,6 +3,7 @@ package com.health.virtualdoctor.ui.user;
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.widget.ImageButton
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
@@ -51,7 +52,8 @@ class UserMetricsActivity : ComponentActivity() {
     private lateinit var tvTemperature: android.widget.TextView
     private lateinit var tvBloodPressure: android.widget.TextView
     private lateinit var tvWeight: android.widget.TextView
-    private lateinit var tvJsonData: android.widget.TextView
+    private lateinit var tvHeight: android.widget.TextView
+    private lateinit var dataSummaryContainer: android.widget.LinearLayout
     private lateinit var btnRefresh: android.widget.Button
 
     private val permissions = setOf(
@@ -72,13 +74,18 @@ class UserMetricsActivity : ComponentActivity() {
         HealthPermission.getReadPermission(StepsCadenceRecord::class),
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
         HealthPermission.getReadPermission(PowerRecord::class),
-        // ✅ NOUVELLE: Hydratation
+        // Hydratation
         HealthPermission.getReadPermission(HydrationRecord::class)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_user_metrics)
+        val btnBack: ImageButton = findViewById(R.id.btnBack)
+        btnBack.setOnClickListener {
+            navigateToWelcome()
+        }
+
 
         // Initialiser les vues
         tvStatus = findViewById(R.id.tvStatus)
@@ -94,7 +101,8 @@ class UserMetricsActivity : ComponentActivity() {
         tvTemperature = findViewById(R.id.tvTemperature)
         tvBloodPressure = findViewById(R.id.tvBloodPressure)
         tvWeight = findViewById(R.id.tvWeight)
-        tvJsonData = findViewById(R.id.tvJsonData)
+        tvHeight = findViewById(R.id.tvHeight)
+        dataSummaryContainer = findViewById(R.id.dataSummaryContainer)
         btnRefresh = findViewById(R.id.btnRefresh)
 
         btnRefresh.setOnClickListener {
@@ -153,7 +161,6 @@ class UserMetricsActivity : ComponentActivity() {
                     val missingPermissions = permissions - grantedPermissions
                     val missingCount = missingPermissions.size
 
-                    // Message plus clair
                     val message = """
                         ⚠️ $missingCount permissions manquantes
 
@@ -170,13 +177,11 @@ class UserMetricsActivity : ComponentActivity() {
                         Toast.LENGTH_LONG
                     ).show()
 
-                    // Log des permissions manquantes
                     Log.w("HealthSync", "Permissions manquantes ($missingCount):")
                     missingPermissions.forEach { permission ->
                         Log.w("HealthSync", "  - ${permission.substringAfterLast(".")}")
                     }
 
-                    // Rediriger vers Health Connect après 3 secondes
                     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                         try {
                             val intent = android.content.Intent("androidx.health.ACTION_MANAGE_PERMISSIONS")
@@ -202,7 +207,6 @@ class UserMetricsActivity : ComponentActivity() {
             try {
                 val grantedPermissions = healthConnectClient.permissionController.getGrantedPermissions()
 
-                // Debug : Afficher les permissions accordées
                 Log.d("HealthSync", "Permissions accordées (${grantedPermissions.size}):")
                 grantedPermissions.forEach { permission ->
                     Log.d("HealthSync", "  ✅ ${permission.substringAfterLast(".")}")
@@ -416,7 +420,7 @@ class UserMetricsActivity : ComponentActivity() {
                     dayJson.put("sleep", sleepArray)
                     dayJson.put("totalSleepHours", String.format("%.1f", totalSleepMinutes / 60.0))
 
-                    // 5️⃣ Exercise (COMPLET AVEC TOUTES LES MÉTRIQUES) 🏋️‍♂️
+                    // 5️⃣ Exercise
                     val exerciseRecords = healthConnectClient.readRecords(
                         ReadRecordsRequest(ExerciseSessionRecord::class, timeRangeFilter)
                     )
@@ -426,7 +430,6 @@ class UserMetricsActivity : ComponentActivity() {
                         val obj = JSONObject()
                         val exerciseTimeRange = TimeRangeFilter.between(record.startTime, record.endTime)
 
-                        // Infos de base
                         obj.put("title", record.title ?: "Exercice")
                         obj.put("exerciseType", record.exerciseType)
                         obj.put("exerciseTypeName", getExerciseTypeName(record.exerciseType))
@@ -436,7 +439,6 @@ class UserMetricsActivity : ComponentActivity() {
                         val durationMinutes = java.time.Duration.between(record.startTime, record.endTime).toMinutes()
                         obj.put("durationMinutes", durationMinutes)
 
-                        // ✅ 1. Pas pendant l'exercice
                         try {
                             val exerciseSteps = healthConnectClient.readRecords(
                                 ReadRecordsRequest(StepsRecord::class, exerciseTimeRange)
@@ -447,7 +449,6 @@ class UserMetricsActivity : ComponentActivity() {
                             obj.put("steps", 0)
                         }
 
-                        // ✅ 2. Distance pendant l'exercice
                         try {
                             val exerciseDistance = healthConnectClient.readRecords(
                                 ReadRecordsRequest(DistanceRecord::class, exerciseTimeRange)
@@ -460,7 +461,6 @@ class UserMetricsActivity : ComponentActivity() {
                             obj.put("distanceKm", "0.00")
                         }
 
-                        // ✅ 3. Calories ACTIVES brûlées
                         try {
                             val activeCalories = healthConnectClient.readRecords(
                                 ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, exerciseTimeRange)
@@ -471,7 +471,6 @@ class UserMetricsActivity : ComponentActivity() {
                             obj.put("activeCalories", 0)
                         }
 
-                        // ✅ 4. Calories TOTALES brûlées
                         try {
                             val totalCalories = healthConnectClient.readRecords(
                                 ReadRecordsRequest(TotalCaloriesBurnedRecord::class, exerciseTimeRange)
@@ -482,7 +481,6 @@ class UserMetricsActivity : ComponentActivity() {
                             obj.put("totalCalories", 0)
                         }
 
-                        // ✅ 5. BPM moyen pendant l'exercice
                         try {
                             val exerciseHR = healthConnectClient.readRecords(
                                 ReadRecordsRequest(HeartRateRecord::class, exerciseTimeRange)
@@ -497,7 +495,6 @@ class UserMetricsActivity : ComponentActivity() {
                             obj.put("avgHeartRate", 0)
                         }
 
-                        // ✅ 6. Cadence (pas/minute) - MOYENNE, MIN, MAX
                         try {
                             val cadenceRecords = healthConnectClient.readRecords(
                                 ReadRecordsRequest(StepsCadenceRecord::class, exerciseTimeRange)
@@ -514,7 +511,6 @@ class UserMetricsActivity : ComponentActivity() {
                             obj.put("maxCadence", 0)
                         }
 
-                        // ✅ 7. Vitesse moyenne/max ET calcul longueur de foulée min/max/moyenne
                         try {
                             val speedRecords = healthConnectClient.readRecords(
                                 ReadRecordsRequest(SpeedRecord::class, exerciseTimeRange)
@@ -529,7 +525,6 @@ class UserMetricsActivity : ComponentActivity() {
                                 obj.put("maxSpeedKmh", String.format("%.2f", maxSpeedMs * 3.6))
                                 obj.put("minSpeedKmh", String.format("%.2f", minSpeedMs * 3.6))
 
-                                // ✅ Calcul longueur de foulée MOYENNE/MIN/MAX (si cadence disponible)
                                 val avgCadence = obj.optInt("avgCadence", 0)
                                 val minCadence = obj.optInt("minCadence", 0)
                                 val maxCadence = obj.optInt("maxCadence", 0)
@@ -539,11 +534,11 @@ class UserMetricsActivity : ComponentActivity() {
                                     obj.put("avgStrideLengthMeters", String.format("%.2f", avgStride))
                                 }
                                 if (maxCadence > 0 && minSpeedMs > 0) {
-                                    val minStride = (minSpeedMs * 60) / maxCadence // foulée min = vitesse min / cadence max
+                                    val minStride = (minSpeedMs * 60) / maxCadence
                                     obj.put("minStrideLengthMeters", String.format("%.2f", minStride))
                                 }
                                 if (minCadence > 0 && maxSpeedMs > 0) {
-                                    val maxStride = (maxSpeedMs * 60) / minCadence // foulée max = vitesse max / cadence min
+                                    val maxStride = (maxSpeedMs * 60) / minCadence
                                     obj.put("maxStrideLengthMeters", String.format("%.2f", maxStride))
                                 }
                             }
@@ -551,7 +546,6 @@ class UserMetricsActivity : ComponentActivity() {
                             // Pas de vitesse disponible
                         }
 
-                        // ✅ 8. Puissance (pour cyclisme)
                         try {
                             val powerRecords = healthConnectClient.readRecords(
                                 ReadRecordsRequest(PowerRecord::class, exerciseTimeRange)
@@ -636,7 +630,7 @@ class UserMetricsActivity : ComponentActivity() {
                     }
                     dayJson.put("height", heightArray)
 
-                    // ✅ NOUVELLE: 1️⃣1️⃣ Hydratation 💧
+                    // 1️⃣1️⃣ Hydratation
                     try {
                         val hydrationRecords = healthConnectClient.readRecords(
                             ReadRecordsRequest(HydrationRecord::class, timeRangeFilter)
@@ -686,44 +680,65 @@ class UserMetricsActivity : ComponentActivity() {
         }
     }
 
+    private fun navigateToWelcome() {
+        val intent = Intent(this, com.health.virtualdoctor.ui.welcome.WelcomeActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        startActivity(intent)
+        finish()
+        overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right)
+    }
+
     private fun updateUI(dayJson: JSONObject) {
         try {
             tvStatus.text = "Données du ${dayJson.getString("date")}"
 
             // Pas
             val totalSteps = dayJson.optLong("totalSteps", 0)
-            tvSteps.text = "👣 Pas : $totalSteps"
+            tvSteps.text = "$totalSteps"
 
             // Distance
             val totalDistanceKm = dayJson.optString("totalDistanceKm", "0.00")
-            tvDistance.text = "📏 Distance : $totalDistanceKm km"
+            tvDistance.text = "$totalDistanceKm km"
 
             // Fréquence cardiaque
             val avgHeartRate = dayJson.optInt("avgHeartRate", 0)
-            tvHeartRate.text = "❤️ BPM moyen : $avgHeartRate"
+            val minHeartRate = dayJson.optInt("minHeartRate", 0)
+            val maxHeartRate = dayJson.optInt("maxHeartRate", 0)
+            if (avgHeartRate > 0) {
+                tvHeartRate.text = "$avgHeartRate bpm"
+            } else {
+                tvHeartRate.text = "-- bpm"
+            }
 
             // Sommeil
             val totalSleepHours = dayJson.optString("totalSleepHours", "0.0")
-            tvSleep.text = "😴 Sommeil : $totalSleepHours h"
+            tvSleep.text = "$totalSleepHours h"
 
             // Hydratation
             val totalHydration = dayJson.optString("totalHydrationLiters", "0.00")
-            tvHydration.text = "💧 Hydratation : $totalHydration L"
+            tvHydration.text = "$totalHydration L"
 
             // Stress
             val stressLevel = dayJson.optString("stressLevel", "Inconnu")
             val stressScore = dayJson.optInt("stressScore", 0)
-            tvStress.text = "🧠 Stress : $stressLevel ($stressScore)"
+            tvStress.text = "$stressLevel"
 
             // Exercices
             val exercises = dayJson.optJSONArray("exercise") ?: JSONArray()
-            tvExerciseCount.text = "🏋️ Exercices : ${exercises.length()}"
+            if (exercises.length() > 0) {
+                tvExerciseCount.text = "${exercises.length()} activité(s) aujourd'hui"
+            } else {
+                tvExerciseCount.text = "Aucun exercice aujourd'hui"
+            }
+
             exerciseContainer.removeAllViews()
             for (i in 0 until exercises.length()) {
                 val ex = exercises.getJSONObject(i)
                 val textView = android.widget.TextView(this)
-                textView.text =
-                    "- ${ex.optString("exerciseTypeName")} (${ex.optString("durationMinutes")} min, ${ex.optString("distanceKm", "0.00")} km)"
+                textView.text = "• ${ex.optString("exerciseTypeName")} - ${ex.optLong("durationMinutes")} min"
+                textView.textSize = 14f
+                textView.setTextColor(resources.getColor(R.color.text_primary, null))
+                textView.setPadding(8, 8, 8, 8)
                 exerciseContainer.addView(textView)
             }
 
@@ -731,45 +746,171 @@ class UserMetricsActivity : ComponentActivity() {
             val oxygenArray = dayJson.optJSONArray("oxygenSaturation") ?: JSONArray()
             if (oxygenArray.length() > 0) {
                 val lastO2 = oxygenArray.getJSONObject(oxygenArray.length() - 1)
-                tvSpO2.text = "🫁 SpO₂ : ${lastO2.optDouble("percentage", 0.0)}%"
+                tvSpO2.text = "${String.format("%.1f", lastO2.optDouble("percentage", 0.0))}%"
             } else {
-                tvSpO2.text = "🫁 SpO₂ : -"
+                tvSpO2.text = "--"
             }
 
             // Température corporelle
             val tempArray = dayJson.optJSONArray("bodyTemperature") ?: JSONArray()
             if (tempArray.length() > 0) {
                 val lastTemp = tempArray.getJSONObject(tempArray.length() - 1)
-                tvTemperature.text = "🌡 Température : ${lastTemp.optDouble("temperature", 0.0)} °C"
+                tvTemperature.text = "${String.format("%.1f", lastTemp.optDouble("temperature", 0.0))}°C"
             } else {
-                tvTemperature.text = "🌡 Température : -"
+                tvTemperature.text = "--"
             }
 
             // Pression artérielle
             val bpArray = dayJson.optJSONArray("bloodPressure") ?: JSONArray()
             if (bpArray.length() > 0) {
                 val lastBP = bpArray.getJSONObject(bpArray.length() - 1)
-                tvBloodPressure.text =
-                    "🩸 Tension : ${lastBP.optDouble("systolic", 0.0)}/${lastBP.optDouble("diastolic", 0.0)} mmHg"
+                tvBloodPressure.text = "${lastBP.optInt("systolic", 0)}/${lastBP.optInt("diastolic", 0)}"
             } else {
-                tvBloodPressure.text = "🩸 Tension : -"
+                tvBloodPressure.text = "--/--"
             }
 
             // Poids
             val weightArray = dayJson.optJSONArray("weight") ?: JSONArray()
             if (weightArray.length() > 0) {
                 val lastWeight = weightArray.getJSONObject(weightArray.length() - 1)
-                tvWeight.text = "⚖️ Poids : ${lastWeight.optDouble("weight", 0.0)} kg"
+                tvWeight.text = "${String.format("%.1f", lastWeight.optDouble("weight", 0.0))} kg"
             } else {
-                tvWeight.text = "⚖️ Poids : -"
+                tvWeight.text = "--"
             }
 
-            // JSON complet (facultatif)
-            tvJsonData.text = dayJson.toString(2)
+            // ✅ Taille (NOUVEAU)
+            val heightArray = dayJson.optJSONArray("height") ?: JSONArray()
+            if (heightArray.length() > 0) {
+                val lastHeight = heightArray.getJSONObject(heightArray.length() - 1)
+                val heightInCm = lastHeight.optDouble("height", 0.0) * 100
+                tvHeight.text = "${String.format("%.0f", heightInCm)} cm"
+            } else {
+                tvHeight.text = "--"
+            }
+
+            // ✅ Résumé des données lisible (remplace JSON brut)
+            updateDataSummary(dayJson)
 
         } catch (e: Exception) {
             tvStatus.text = "❌ Erreur mise à jour UI : ${e.message}"
             e.printStackTrace()
+        }
+    }
+
+    private fun updateDataSummary(dayJson: JSONObject) {
+        dataSummaryContainer.removeAllViews()
+
+        val summaryItems = mutableListOf<Pair<String, String>>()
+
+        // Activité physique
+        val totalSteps = dayJson.optLong("totalSteps", 0)
+        val totalDistance = dayJson.optString("totalDistanceKm", "0.00")
+        summaryItems.add("👣 Activité" to "$totalSteps pas • $totalDistance km parcourus")
+
+        // Sommeil
+        val sleepHours = dayJson.optString("totalSleepHours", "0.0")
+        val sleepArray = dayJson.optJSONArray("sleep")
+        val sleepCount = sleepArray?.length() ?: 0
+        summaryItems.add("💤 Sommeil" to "$sleepHours heures • $sleepCount session(s)")
+
+        // Cardio
+        val avgHR = dayJson.optInt("avgHeartRate", 0)
+        val minHR = dayJson.optInt("minHeartRate", 0)
+        val maxHR = dayJson.optInt("maxHeartRate", 0)
+        if (avgHR > 0) {
+            summaryItems.add("❤️ Fréquence cardiaque" to "Moy: $avgHR bpm • Min: $minHR • Max: $maxHR")
+        }
+
+        // Hydratation
+        val hydration = dayJson.optString("totalHydrationLiters", "0.00")
+        if (hydration.toDouble() > 0) {
+            summaryItems.add("💧 Hydratation" to "$hydration litres consommés")
+        }
+
+        // Exercices
+        val exercises = dayJson.optJSONArray("exercise")
+        if (exercises != null && exercises.length() > 0) {
+            val exerciseNames = mutableListOf<String>()
+            for (i in 0 until exercises.length()) {
+                val ex = exercises.getJSONObject(i)
+                exerciseNames.add(ex.optString("exerciseTypeName"))
+            }
+            summaryItems.add("🏋️ Exercices" to exerciseNames.joinToString(", "))
+        }
+
+        // Signes vitaux
+        val oxygenArray = dayJson.optJSONArray("oxygenSaturation")
+        if (oxygenArray != null && oxygenArray.length() > 0) {
+            val lastO2 = oxygenArray.getJSONObject(oxygenArray.length() - 1)
+            summaryItems.add("🫁 Oxygénation" to "${String.format("%.1f", lastO2.optDouble("percentage"))}% SpO₂")
+        }
+
+        val tempArray = dayJson.optJSONArray("bodyTemperature")
+        if (tempArray != null && tempArray.length() > 0) {
+            val lastTemp = tempArray.getJSONObject(tempArray.length() - 1)
+            summaryItems.add("🌡️ Température" to "${String.format("%.1f", lastTemp.optDouble("temperature"))}°C")
+        }
+
+        val bpArray = dayJson.optJSONArray("bloodPressure")
+        if (bpArray != null && bpArray.length() > 0) {
+            val lastBP = bpArray.getJSONObject(bpArray.length() - 1)
+            summaryItems.add("💉 Tension artérielle" to "${lastBP.optInt("systolic")}/${lastBP.optInt("diastolic")} mmHg")
+        }
+
+        val weightArray = dayJson.optJSONArray("weight")
+        if (weightArray != null && weightArray.length() > 0) {
+            val lastWeight = weightArray.getJSONObject(weightArray.length() - 1)
+            summaryItems.add("⚖️ Poids" to "${String.format("%.1f", lastWeight.optDouble("weight"))} kg")
+        }
+
+        val heightArray = dayJson.optJSONArray("height")
+        if (heightArray != null && heightArray.length() > 0) {
+            val lastHeight = heightArray.getJSONObject(heightArray.length() - 1)
+            val heightInCm = lastHeight.optDouble("height") * 100
+            summaryItems.add("📐 Taille" to "${String.format("%.0f", heightInCm)} cm")
+        }
+
+        // Stress
+        val stressLevel = dayJson.optString("stressLevel", "Inconnu")
+        val stressScore = dayJson.optInt("stressScore", 0)
+        summaryItems.add("🧠 Niveau de stress" to "$stressLevel (score: $stressScore/100)")
+
+        // Créer les vues
+        for ((label, value) in summaryItems) {
+            val itemLayout = android.widget.LinearLayout(this)
+            itemLayout.orientation = android.widget.LinearLayout.VERTICAL
+            itemLayout.setPadding(0, 12, 0, 12)
+
+            val labelView = android.widget.TextView(this)
+            labelView.text = label
+            labelView.textSize = 14f
+            labelView.setTypeface(null, android.graphics.Typeface.BOLD)
+            labelView.setTextColor(resources.getColor(R.color.text_primary, null))
+
+            val valueView = android.widget.TextView(this)
+            valueView.text = value
+            valueView.textSize = 13f
+            valueView.setTextColor(resources.getColor(R.color.text_secondary, null))
+            valueView.setPadding(0, 4, 0, 0)
+
+            itemLayout.addView(labelView)
+            itemLayout.addView(valueView)
+
+            dataSummaryContainer.addView(itemLayout)
+
+            // Ajouter un séparateur
+            if (summaryItems.indexOf(label to value) < summaryItems.size - 1) {
+                val divider = android.view.View(this)
+                val params = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    1
+                )
+                params.setMargins(0, 8, 0, 8)
+                divider.layoutParams = params
+                divider.setBackgroundColor(resources.getColor(android.R.color.darker_gray, null))
+                divider.alpha = 0.2f
+                dataSummaryContainer.addView(divider)
+            }
         }
     }
 
