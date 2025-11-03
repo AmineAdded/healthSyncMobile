@@ -29,6 +29,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import java.util.Locale
 
 class UserMetricsActivity : ComponentActivity() {
 
@@ -146,7 +147,7 @@ class UserMetricsActivity : ComponentActivity() {
         try {
             healthConnectClient = HealthConnectClient.getOrCreate(this)
         } catch (e: Exception) {
-            Toast.makeText(this, "Erreur: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Erreurrr: ${e.message}", Toast.LENGTH_LONG).show()
             return
         }
 
@@ -399,7 +400,7 @@ class UserMetricsActivity : ComponentActivity() {
                         distArray.put(obj)
                     }
                     dayJson.put("distance", distArray)
-                    dayJson.put("totalDistanceKm", String.format("%.2f", totalDistance / 1000))
+                    dayJson.put("totalDistanceKm", String.format(Locale.US, "%.2f", totalDistance / 1000))
 
                     // 4️⃣ Sleep
                     val sleepRecords = healthConnectClient.readRecords(
@@ -418,7 +419,7 @@ class UserMetricsActivity : ComponentActivity() {
                         sleepArray.put(obj)
                     }
                     dayJson.put("sleep", sleepArray)
-                    dayJson.put("totalSleepHours", String.format("%.1f", totalSleepMinutes / 60.0))
+                    dayJson.put("totalSleepHours", String.format(Locale.US, "%.1f", totalSleepMinutes / 60.0))
 
                     // 5️⃣ Exercise
                     val exerciseRecords = healthConnectClient.readRecords(
@@ -455,7 +456,7 @@ class UserMetricsActivity : ComponentActivity() {
                             )
                             val totalDistanceMeters = exerciseDistance.records.sumOf { it.distance.inMeters }
                             obj.put("distanceMeters", totalDistanceMeters)
-                            obj.put("distanceKm", String.format("%.2f", totalDistanceMeters / 1000))
+                            obj.put("distanceKm", String.format(Locale.US, "%.2f", totalDistanceMeters / 1000))
                         } catch (e: Exception) {
                             obj.put("distanceMeters", 0.0)
                             obj.put("distanceKm", "0.00")
@@ -521,9 +522,9 @@ class UserMetricsActivity : ComponentActivity() {
                                 val maxSpeedMs = speeds.maxOrNull()!!
                                 val minSpeedMs = speeds.minOrNull()!!
 
-                                obj.put("avgSpeedKmh", String.format("%.2f", avgSpeedMs * 3.6))
-                                obj.put("maxSpeedKmh", String.format("%.2f", maxSpeedMs * 3.6))
-                                obj.put("minSpeedKmh", String.format("%.2f", minSpeedMs * 3.6))
+                                obj.put("avgSpeedKmh", String.format(Locale.US, "%.2f", avgSpeedMs * 3.6))
+                                obj.put("maxSpeedKmh", String.format(Locale.US, "%.2f", maxSpeedMs * 3.6))
+                                obj.put("minSpeedKmh", String.format(Locale.US, "%.2f", minSpeedMs * 3.6))
 
                                 val avgCadence = obj.optInt("avgCadence", 0)
                                 val minCadence = obj.optInt("minCadence", 0)
@@ -531,15 +532,15 @@ class UserMetricsActivity : ComponentActivity() {
 
                                 if (avgCadence > 0) {
                                     val avgStride = (avgSpeedMs * 60) / avgCadence
-                                    obj.put("avgStrideLengthMeters", String.format("%.2f", avgStride))
+                                    obj.put("avgStrideLengthMeters", String.format(Locale.US, "%.2f", avgStride))
                                 }
                                 if (maxCadence > 0 && minSpeedMs > 0) {
                                     val minStride = (minSpeedMs * 60) / maxCadence
-                                    obj.put("minStrideLengthMeters", String.format("%.2f", minStride))
+                                    obj.put("minStrideLengthMeters", String.format(Locale.US, "%.2f", minStride))
                                 }
                                 if (minCadence > 0 && maxSpeedMs > 0) {
                                     val maxStride = (maxSpeedMs * 60) / minCadence
-                                    obj.put("maxStrideLengthMeters", String.format("%.2f", maxStride))
+                                    obj.put("maxStrideLengthMeters", String.format(Locale.US, "%.2f", maxStride))
                                 }
                             }
                         } catch (e: Exception) {
@@ -645,7 +646,7 @@ class UserMetricsActivity : ComponentActivity() {
                             hydrationArray.put(obj)
                         }
                         dayJson.put("hydration", hydrationArray)
-                        dayJson.put("totalHydrationLiters", String.format("%.2f", totalHydrationMl / 1000))
+                        dayJson.put("totalHydrationLiters", String.format(Locale.US, "%.2f", totalHydrationMl / 1000))
                     } catch (e: Exception) {
                         dayJson.put("hydration", JSONArray())
                         dayJson.put("totalHydrationLiters", "0.00")
@@ -702,8 +703,6 @@ class UserMetricsActivity : ComponentActivity() {
 
             // Fréquence cardiaque
             val avgHeartRate = dayJson.optInt("avgHeartRate", 0)
-            val minHeartRate = dayJson.optInt("minHeartRate", 0)
-            val maxHeartRate = dayJson.optInt("maxHeartRate", 0)
             if (avgHeartRate > 0) {
                 tvHeartRate.text = "$avgHeartRate bpm"
             } else {
@@ -720,10 +719,9 @@ class UserMetricsActivity : ComponentActivity() {
 
             // Stress
             val stressLevel = dayJson.optString("stressLevel", "Inconnu")
-            val stressScore = dayJson.optInt("stressScore", 0)
             tvStress.text = "$stressLevel"
 
-            // Exercices
+            // ✅ NOUVELLE VERSION : Exercices avec détails
             val exercises = dayJson.optJSONArray("exercise") ?: JSONArray()
             if (exercises.length() > 0) {
                 tvExerciseCount.text = "${exercises.length()} activité(s) aujourd'hui"
@@ -734,19 +732,15 @@ class UserMetricsActivity : ComponentActivity() {
             exerciseContainer.removeAllViews()
             for (i in 0 until exercises.length()) {
                 val ex = exercises.getJSONObject(i)
-                val textView = android.widget.TextView(this)
-                textView.text = "• ${ex.optString("exerciseTypeName")} - ${ex.optLong("durationMinutes")} min"
-                textView.textSize = 14f
-                textView.setTextColor(resources.getColor(R.color.text_primary, null))
-                textView.setPadding(8, 8, 8, 8)
-                exerciseContainer.addView(textView)
+                val exerciseCard = createExerciseCard(ex)
+                exerciseContainer.addView(exerciseCard)
             }
 
             // SpO2
             val oxygenArray = dayJson.optJSONArray("oxygenSaturation") ?: JSONArray()
             if (oxygenArray.length() > 0) {
                 val lastO2 = oxygenArray.getJSONObject(oxygenArray.length() - 1)
-                tvSpO2.text = "${String.format("%.1f", lastO2.optDouble("percentage", 0.0))}%"
+                tvSpO2.text = "${String.format(Locale.US, "%.1f", lastO2.optDouble("percentage", 0.0))}%"
             } else {
                 tvSpO2.text = "--"
             }
@@ -755,7 +749,7 @@ class UserMetricsActivity : ComponentActivity() {
             val tempArray = dayJson.optJSONArray("bodyTemperature") ?: JSONArray()
             if (tempArray.length() > 0) {
                 val lastTemp = tempArray.getJSONObject(tempArray.length() - 1)
-                tvTemperature.text = "${String.format("%.1f", lastTemp.optDouble("temperature", 0.0))}°C"
+                tvTemperature.text = "${String.format(Locale.US, "%.1f", lastTemp.optDouble("temperature", 0.0))}°C"
             } else {
                 tvTemperature.text = "--"
             }
@@ -773,28 +767,226 @@ class UserMetricsActivity : ComponentActivity() {
             val weightArray = dayJson.optJSONArray("weight") ?: JSONArray()
             if (weightArray.length() > 0) {
                 val lastWeight = weightArray.getJSONObject(weightArray.length() - 1)
-                tvWeight.text = "${String.format("%.1f", lastWeight.optDouble("weight", 0.0))} kg"
+                tvWeight.text = "${String.format(Locale.US, "%.1f", lastWeight.optDouble("weight", 0.0))} kg"
             } else {
                 tvWeight.text = "--"
             }
 
-            // ✅ Taille (NOUVEAU)
+            // Taille
             val heightArray = dayJson.optJSONArray("height") ?: JSONArray()
             if (heightArray.length() > 0) {
                 val lastHeight = heightArray.getJSONObject(heightArray.length() - 1)
                 val heightInCm = lastHeight.optDouble("height", 0.0) * 100
-                tvHeight.text = "${String.format("%.0f", heightInCm)} cm"
+                tvHeight.text = "${String.format(Locale.US, "%.0f", heightInCm)} cm"
             } else {
                 tvHeight.text = "--"
             }
 
-            // ✅ Résumé des données lisible (remplace JSON brut)
+            // Résumé des données
             updateDataSummary(dayJson)
 
         } catch (e: Exception) {
             tvStatus.text = "❌ Erreur mise à jour UI : ${e.message}"
             e.printStackTrace()
         }
+    }
+
+    // ✅ NOUVELLE FONCTION : Créer une carte visuelle pour chaque exercice
+    private fun createExerciseCard(exercise: JSONObject): androidx.cardview.widget.CardView {
+        val cardView = androidx.cardview.widget.CardView(this).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, dpToPx(12))
+            }
+            radius = dpToPx(12).toFloat()
+            cardElevation = dpToPx(2).toFloat()
+            setCardBackgroundColor(getColor(android.R.color.white))
+        }
+
+        val mainLayout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(16))
+        }
+
+        // En-tête : Nom de l'exercice + Durée
+        val headerLayout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val exerciseName = exercise.optString("exerciseTypeName", "Exercice")
+        val duration = exercise.optLong("durationMinutes", 0)
+
+        val tvName = android.widget.TextView(this).apply {
+            text = "🏃 $exerciseName"
+            textSize = 18f
+            setTextColor(getColor(R.color.text_primary))
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+        }
+
+        val tvDuration = android.widget.TextView(this).apply {
+            text = "$duration min"
+            textSize = 16f
+            setTextColor(getColor(R.color.primary))
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+
+        headerLayout.addView(tvName)
+        headerLayout.addView(tvDuration)
+        mainLayout.addView(headerLayout)
+
+        // Ligne de séparation
+        val divider = android.view.View(this).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                1
+            ).apply {
+                setMargins(0, dpToPx(12), 0, dpToPx(12))
+            }
+            setBackgroundColor(getColor(android.R.color.darker_gray))
+        }
+        mainLayout.addView(divider)
+
+        // Grille de statistiques (3 colonnes)
+        val statsGrid = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            weightSum = 3f
+        }
+
+        // Cadence
+        val avgCadence = exercise.optInt("avgCadence", 0)
+        val cadenceText = if (avgCadence > 0) "$avgCadence spm" else "-- spm"
+        val cadenceView = createStatView("🦶 Cadence", cadenceText)
+        statsGrid.addView(cadenceView)
+
+        // BPM moyen
+        val avgBpm = exercise.optInt("avgHeartRate", 0)
+        val bpmText = if (avgBpm > 0) "$avgBpm bpm" else "-- bpm"
+        val bpmView = createStatView("❤️ BPM Moy", bpmText)
+        statsGrid.addView(bpmView)
+
+        // Distance
+        val distanceKm = exercise.optString("distanceKm", "0.00")
+        val distanceMeters = exercise.optDouble("distanceMeters", 0.0)
+        val distanceText = if (distanceMeters >= 1000) {
+            "$distanceKm km"
+        } else if (distanceMeters > 0) {
+            "${String.format(Locale.US, "%.0f", distanceMeters)} m"
+        } else {
+            "-- m"
+        }
+        val distanceView = createStatView("📏 Distance", distanceText)
+        statsGrid.addView(distanceView)
+
+        mainLayout.addView(statsGrid)
+
+        // Statistiques supplémentaires (optionnel)
+        val hasExtraStats = exercise.optInt("steps", 0) > 0 ||
+                exercise.optInt("activeCalories", 0) > 0 ||
+                exercise.optString("avgSpeedKmh", "").isNotEmpty()
+
+        if (hasExtraStats) {
+            val extraStatsLayout = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setPadding(0, dpToPx(8), 0, 0)
+            }
+
+            // Pas pendant l'exercice
+            val steps = exercise.optInt("steps", 0)
+            if (steps > 0) {
+                val stepsText = android.widget.TextView(this).apply {
+                    text = "• $steps pas pendant l'exercice"
+                    textSize = 12f
+                    setTextColor(getColor(R.color.text_secondary))
+                    setPadding(0, dpToPx(2), 0, dpToPx(2))
+                }
+                extraStatsLayout.addView(stepsText)
+            }
+
+            // Calories
+            val calories = exercise.optInt("activeCalories", 0)
+            if (calories > 0) {
+                val caloriesText = android.widget.TextView(this).apply {
+                    text = "• $calories kcal brûlées"
+                    textSize = 12f
+                    setTextColor(getColor(R.color.text_secondary))
+                    setPadding(0, dpToPx(2), 0, dpToPx(2))
+                }
+                extraStatsLayout.addView(caloriesText)
+            }
+
+            // Vitesse moyenne
+            val avgSpeed = exercise.optString("avgSpeedKmh", "")
+            if (avgSpeed.isNotEmpty()) {
+                val speedText = android.widget.TextView(this).apply {
+                    text = "• Vitesse moy: $avgSpeed km/h"
+                    textSize = 12f
+                    setTextColor(getColor(R.color.text_secondary))
+                    setPadding(0, dpToPx(2), 0, dpToPx(2))
+                }
+                extraStatsLayout.addView(speedText)
+            }
+
+            mainLayout.addView(extraStatsLayout)
+        }
+
+        cardView.addView(mainLayout)
+        return cardView
+    }
+
+    // ✅ NOUVELLE FONCTION : Créer une vue pour une statistique
+    private fun createStatView(label: String, value: String): android.widget.LinearLayout {
+        val layout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            gravity = android.view.Gravity.CENTER
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                0,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+        }
+
+        val tvLabel = android.widget.TextView(this).apply {
+            text = label
+            textSize = 11f
+            setTextColor(getColor(R.color.text_secondary))
+            gravity = android.view.Gravity.CENTER
+        }
+
+        val tvValue = android.widget.TextView(this).apply {
+            text = value
+            textSize = 14f
+            setTextColor(getColor(R.color.text_primary))
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, dpToPx(4), 0, 0)
+        }
+
+        layout.addView(tvLabel)
+        layout.addView(tvValue)
+
+        return layout
+    }
+
+    // ✅ NOUVELLE FONCTION : Convertir dp en pixels
+    private fun dpToPx(dp: Int): Int {
+        val density = resources.displayMetrics.density
+        return (dp * density).toInt()
     }
 
     private fun updateDataSummary(dayJson: JSONObject) {
@@ -842,13 +1034,13 @@ class UserMetricsActivity : ComponentActivity() {
         val oxygenArray = dayJson.optJSONArray("oxygenSaturation")
         if (oxygenArray != null && oxygenArray.length() > 0) {
             val lastO2 = oxygenArray.getJSONObject(oxygenArray.length() - 1)
-            summaryItems.add("🫁 Oxygénation" to "${String.format("%.1f", lastO2.optDouble("percentage"))}% SpO₂")
+            summaryItems.add("🫁 Oxygénation" to "${String.format(Locale.US, "%.1f", lastO2.optDouble("percentage"))}% SpO₂")
         }
 
         val tempArray = dayJson.optJSONArray("bodyTemperature")
         if (tempArray != null && tempArray.length() > 0) {
             val lastTemp = tempArray.getJSONObject(tempArray.length() - 1)
-            summaryItems.add("🌡️ Température" to "${String.format("%.1f", lastTemp.optDouble("temperature"))}°C")
+            summaryItems.add("🌡️ Température" to "${String.format(Locale.US, "%.1f", lastTemp.optDouble("temperature"))}°C")
         }
 
         val bpArray = dayJson.optJSONArray("bloodPressure")
@@ -860,14 +1052,14 @@ class UserMetricsActivity : ComponentActivity() {
         val weightArray = dayJson.optJSONArray("weight")
         if (weightArray != null && weightArray.length() > 0) {
             val lastWeight = weightArray.getJSONObject(weightArray.length() - 1)
-            summaryItems.add("⚖️ Poids" to "${String.format("%.1f", lastWeight.optDouble("weight"))} kg")
+            summaryItems.add("⚖️ Poids" to "${String.format(Locale.US, "%.1f", lastWeight.optDouble("weight"))} kg")
         }
 
         val heightArray = dayJson.optJSONArray("height")
         if (heightArray != null && heightArray.length() > 0) {
             val lastHeight = heightArray.getJSONObject(heightArray.length() - 1)
             val heightInCm = lastHeight.optDouble("height") * 100
-            summaryItems.add("📐 Taille" to "${String.format("%.0f", heightInCm)} cm")
+            summaryItems.add("📐 Taille" to "${String.format(Locale.US, "%.0f", heightInCm)} cm")
         }
 
         // Stress

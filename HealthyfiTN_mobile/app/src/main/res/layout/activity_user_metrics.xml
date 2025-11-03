@@ -433,9 +433,7 @@
                         android:id="@+id/exerciseContainer"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:divider="@android:drawable/divider_horizontal_bright"
-                        android:showDividers="middle" />
+                        android:orientation="vertical" />
 
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -648,7 +646,7 @@
                                 </LinearLayout>
                             </androidx.cardview.widget.CardView>
 
-                            <!-- Height (NOUVEAU) -->
+                            <!-- Height -->
                             <androidx.cardview.widget.CardView
                                 android:layout_width="130dp"
                                 android:layout_height="wrap_content"
@@ -695,7 +693,7 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Health Summary Section (Remplace JSON brut) -->
+            <!-- Health Summary Section -->
             <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -727,9 +725,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:background="#F5F5F5"
-                        android:padding="12dp"
-                        android:divider="@android:drawable/divider_horizontal_bright"
-                        android:showDividers="middle">
+                        android:padding="12dp">
 
                         <TextView
                             android:layout_width="wrap_content"
