@@ -10,6 +10,10 @@
         <option value="$PROJECT_DIR$/pom.xml" />
         <option value="$PROJECT_DIR$/../healthV1/doctor-activation-service/pom.xml" />
         <option value="$PROJECT_DIR$/../healthV2(Amine)/healthserver/pom.xml" />
+        <option value="$PROJECT_DIR$/../../../healthserver/pom.xml" />
+        <option value="$PROJECT_DIR$/healthserver/pom.xml" />
+        <option value="$PROJECT_DIR$/discovery-service/pom.xml" />
+        <option value="$PROJECT_DIR$/eureka-server/pom.xml" />
       </list>
     </option>
     <option name="ignoredFiles">

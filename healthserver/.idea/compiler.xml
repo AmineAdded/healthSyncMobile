@@ -7,12 +7,13 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="api-gateway" />
         <module name="doctor-activation-service" />
         <module name="auth-service" />
         <module name="config-service" />
-        <module name="user-service" />
         <module name="shared-library" />
+        <module name="api-gateway" />
+        <module name="user-service" />
+        <module name="discovery-service" />
       </profile>
       <profile name="Annotation profile for Health App Microservices" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -41,6 +42,7 @@
       <module name="api-gateway" options="-parameters" />
       <module name="auth-service" options="-parameters" />
       <module name="config-service" options="-parameters" />
+      <module name="discovery-service" options="-parameters" />
       <module name="doctor-activation-service" options="-parameters" />
       <module name="health-app-microservices" options="-parameters" />
       <module name="healthserver" options="-parameters" />
