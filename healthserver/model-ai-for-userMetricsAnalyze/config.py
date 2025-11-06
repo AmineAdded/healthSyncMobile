@@ -1,9 +1,13 @@
 # config.py
 import os
+from dotenv import load_dotenv
+
+# Charger le fichier .env
+load_dotenv()
 
 class Config:
     # API Configuration
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     GROQ_MODEL = "llama-3.1-70b-versatile"
 
     # Server Configuration

@@ -18,6 +18,7 @@ from sklearn.ensemble import IsolationForest, RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import requests
 import json
+from config import Config
 
 app = FastAPI(title="Health AI System", version="2.0.0")
 
@@ -395,7 +396,7 @@ class AIExplainer:
     """Génère des explications avec Groq API (gratuit)"""
     
     def __init__(self):
-        self.api_key = "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"
+        self.api_key = Config.GROQ_API_KEY
         self.api_url = "https://api.groq.com/openai/v1/chat/completions"
         self.model = "llama-3.1-70b-versatile"
     
