@@ -6,15 +6,21 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.util.Patterns
 import android.view.View
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.health.virtualdoctor.R
+import com.health.virtualdoctor.ui.doctor.DoctorDashboardActivity
 
 class LoginActivity : AppCompatActivity() {
 
+    private lateinit var rgUserType: RadioGroup
+    private lateinit var rbPatient: RadioButton
+    private lateinit var rbDoctor: RadioButton
     private lateinit var tilEmail: TextInputLayout
     private lateinit var etEmail: TextInputEditText
     private lateinit var tilPassword: TextInputLayout
@@ -27,7 +33,6 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        // Rendre la barre de statut transparente
         window.statusBarColor = resources.getColor(R.color.transparent, theme)
 
         initViews()
@@ -36,6 +41,9 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
+        rgUserType = findViewById(R.id.rgUserTypeLogin)
+        rbPatient = findViewById(R.id.rbPatientLogin)
+        rbDoctor = findViewById(R.id.rbDoctorLogin)
         tilEmail = findViewById(R.id.tilEmail)
         etEmail = findViewById(R.id.etEmail)
         tilPassword = findViewById(R.id.tilPassword)
@@ -62,7 +70,6 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun setupValidation() {
-        // Validation en temps réel pour l'email
         etEmail.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -71,7 +78,6 @@ class LoginActivity : AppCompatActivity() {
             }
         })
 
-        // Validation en temps réel pour le mot de passe
         etPassword.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -84,7 +90,6 @@ class LoginActivity : AppCompatActivity() {
     private fun validateInputs(): Boolean {
         var isValid = true
 
-        // Validation email
         val email = etEmail.text.toString().trim()
         if (email.isEmpty()) {
             tilEmail.error = "L'email est requis"
@@ -96,7 +101,6 @@ class LoginActivity : AppCompatActivity() {
             tilEmail.error = null
         }
 
-        // Validation mot de passe
         val password = etPassword.text.toString()
         if (password.isEmpty()) {
             tilPassword.error = "Le mot de passe est requis"
@@ -114,22 +118,40 @@ class LoginActivity : AppCompatActivity() {
     private fun performLogin() {
         val email = etEmail.text.toString().trim()
         val password = etPassword.text.toString()
+        val isDoctor = rbDoctor.isChecked
 
-        // Désactiver le bouton pendant le traitement
         btnLogin.isEnabled = false
         btnLogin.text = "Connexion..."
 
-        // Simuler une connexion (à remplacer par l'appel API réel)
+        // Simuler une connexion API
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             btnLogin.isEnabled = true
             btnLogin.text = getString(R.string.login_button)
 
-            // Pour le moment, afficher un message de succès
             Toast.makeText(this, "Connexion réussie!", Toast.LENGTH_SHORT).show()
 
-            // TODO: Navigation vers HomeActivity ou DoctorDashboardActivity selon le rôle
-            // navigateToHome()
-        }, 2000)
+            // Navigation selon le type d'utilisateur
+            if (isDoctor) {
+                navigateToDoctorDashboard()
+            } else {
+                navigateToPatientHome()
+            }
+        }, 1500)
+    }
+
+    private fun navigateToDoctorDashboard() {
+        val intent = Intent(this, DoctorDashboardActivity::class.java)
+        startActivity(intent)
+        finish()
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+    }
+
+    private fun navigateToPatientHome() {
+        // TODO: Créer PatientHomeActivity
+        Toast.makeText(this, "Navigation vers Patient Home", Toast.LENGTH_SHORT).show()
+        // val intent = Intent(this, PatientHomeActivity::class.java)
+        // startActivity(intent)
+        // finish()
     }
 
     private fun navigateToRegister() {
@@ -137,11 +159,4 @@ class LoginActivity : AppCompatActivity() {
         startActivity(intent)
         overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right)
     }
-
-    // À implémenter plus tard
-    // private fun navigateToHome() {
-    //     val intent = Intent(this, HomeActivity::class.java)
-    //     startActivity(intent)
-    //     finish()
-    // }
 }

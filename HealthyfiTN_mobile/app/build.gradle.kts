@@ -87,6 +87,7 @@ dependencies {
 
     // OkHttp - Version récente
     implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.12")
+    implementation(libs.androidx.activity)
 
     // Desugaring pour java.time sur API < 26
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")

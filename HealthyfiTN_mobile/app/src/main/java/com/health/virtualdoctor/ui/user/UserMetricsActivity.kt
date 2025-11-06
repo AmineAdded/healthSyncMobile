@@ -3,6 +3,7 @@ package com.health.virtualdoctor.ui.user;
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -16,6 +17,8 @@ import androidx.health.connect.client.records.*
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.health.virtualdoctor.ui.auth.LoginActivity
+import com.health.virtualdoctor.ui.consultation.ConsultationActivity
+import com.health.virtualdoctor.ui.meal.MealAnalysisActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,12 +35,16 @@ import kotlin.math.roundToInt
 import java.util.Locale
 
 class UserMetricsActivity : ComponentActivity() {
+    private lateinit var cardAnalyze: androidx.cardview.widget.CardView
+    private lateinit var cardConsult: androidx.cardview.widget.CardView
 
     private lateinit var healthConnectClient: HealthConnectClient
     private lateinit var requestPermissions: ActivityResultLauncher<Set<String>>
 
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         .withZone(ZoneId.systemDefault())
+    private lateinit var avatarContainer: FrameLayout
+    private lateinit var humanBodyRenderer: HumanBodyRenderer
 
     // Views
     private lateinit var tvStatus: android.widget.TextView
@@ -56,6 +63,7 @@ class UserMetricsActivity : ComponentActivity() {
     private lateinit var tvHeight: android.widget.TextView
     private lateinit var dataSummaryContainer: android.widget.LinearLayout
     private lateinit var btnRefresh: android.widget.Button
+
 
     private val permissions = setOf(
         // Permissions de base
@@ -109,6 +117,47 @@ class UserMetricsActivity : ComponentActivity() {
         btnRefresh.setOnClickListener {
             checkPermissions()
         }
+        // Initialiser les boutons
+        cardAnalyze = findViewById(R.id.cardAnalyze)
+        cardConsult = findViewById(R.id.cardConsult)
+        avatarContainer = findViewById(R.id.avatarContainer)
+        humanBodyRenderer = HumanBodyRenderer(this)
+
+
+// Click listeners avec animations
+        cardAnalyze.setOnClickListener {
+            it.animate()
+                .scaleX(0.95f)
+                .scaleY(0.95f)
+                .setDuration(100)
+                .withEndAction {
+                    it.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(100)
+                        .withEndAction {
+                            navigateToMealAnalysis()
+                        }
+                }
+        }
+
+        cardConsult.setOnClickListener {
+            it.animate()
+                .scaleX(0.95f)
+                .scaleY(0.95f)
+                .setDuration(100)
+                .withEndAction {
+                    it.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(100)
+                        .withEndAction {
+                            navigateToConsultation()
+                        }
+                }
+        }
+        avatarContainer.addView(humanBodyRenderer.getView())
+        humanBodyRenderer.loadModel()
 
         val availabilityStatus = HealthConnectClient.getSdkStatus(this)
 
@@ -325,6 +374,17 @@ class UserMetricsActivity : ComponentActivity() {
             90 -> "Entraînement général"
             else -> "Activité ($type)"
         }
+    }
+    private fun navigateToMealAnalysis() {
+        val intent = Intent(this, MealAnalysisActivity::class.java)
+        startActivity(intent)
+        overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right)
+    }
+
+    private fun navigateToConsultation() {
+        val intent = Intent(this, ConsultationActivity::class.java)
+        startActivity(intent)
+        overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right)
     }
 
     private fun readAndSendData() {
@@ -784,6 +844,7 @@ class UserMetricsActivity : ComponentActivity() {
 
             // Résumé des données
             updateDataSummary(dayJson)
+            humanBodyRenderer.updateHealthData(dayJson)
 
         } catch (e: Exception) {
             tvStatus.text = "❌ Erreur mise à jour UI : ${e.message}"
