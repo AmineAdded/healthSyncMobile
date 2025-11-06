@@ -7,22 +7,19 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="api-gateway" />
         <module name="doctor-activation-service" />
         <module name="auth-service" />
         <module name="config-service" />
-        <module name="shared-library" />
-        <module name="api-gateway" />
         <module name="user-service" />
-        <module name="eureka-server" />
-        <module name="discovery-service" />
+        <module name="shared-library" />
       </profile>
       <profile name="Annotation profile for healthserver" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.40/lombok-1.18.40.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.40/lombok-1.18.40.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.32/lombok-1.18.32.jar" />
         </processorPath>
         <module name="healthserver" />
       </profile>
@@ -37,16 +34,13 @@
         <module name="notification-service" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel target="23" />
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="api-gateway" options="-parameters" />
       <module name="auth-service" options="-parameters" />
       <module name="config-service" options="-parameters" />
-      <module name="discovery-service" options="-parameters" />
       <module name="doctor-activation-service" options="-parameters" />
-      <module name="eureka-server" options="-parameters" />
       <module name="health-app-microservices" options="-parameters" />
       <module name="healthserver" options="-parameters" />
       <module name="notification-service" options="-parameters" />
