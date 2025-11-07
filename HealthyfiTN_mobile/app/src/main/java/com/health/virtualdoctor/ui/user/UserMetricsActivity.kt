@@ -1214,7 +1214,7 @@ class UserMetricsActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 // 1. Envoyer au Spring Boot (MongoDB)
-                val springBootUrl = "https://knit-craig-exclusive-uses.trycloudflare.com/fetch"
+                val springBootUrl = "https://discounts-redhead-generates-kinds.trycloudflare.com/fetch"
 
                 val result = withContext(Dispatchers.IO) {
                     val client = OkHttpClient.Builder()

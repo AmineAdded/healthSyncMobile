@@ -26,7 +26,7 @@ class HealthAnalysisActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_USER_DATA = "user_data_json"
-        const val AI_API_URL = "https://poster-meals-russell-metallica.trycloudflare.com/analyze-health" // Changez l'IP
+        const val AI_API_URL = "https://trailers-careful-tuner-condition.trycloudflare.com/analyze-health" // Changez l'IP
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

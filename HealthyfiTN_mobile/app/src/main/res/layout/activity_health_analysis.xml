@@ -440,7 +440,7 @@
                         android:id="@+id/tvAnomaliesCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="⚠️ Anomalies Détectées"
+                        android:text="Anomalies Détectées"
                         android:textSize="18sp"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary"
