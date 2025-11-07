@@ -269,39 +269,39 @@ class AdvancedHealthAnalyzer:
         
         # Fréquence cardiaque
         if data.avgHeartRate < 50:
-            anomalies.append("⚠️ Bradycardie détectée (FC < 50 bpm)")
+            anomalies.append("Bradycardie détectée (FC < 50 bpm)")
         elif data.avgHeartRate > 110:
-            anomalies.append("⚠️ Tachycardie détectée (FC > 110 bpm)")
+            anomalies.append("Tachycardie détectée (FC > 110 bpm)")
         
         # Sommeil
         if data.totalSleepHours < 5:
-            anomalies.append("⚠️ Privation de sommeil sévère (< 5h)")
+            anomalies.append("Privation de sommeil sévère (< 5h)")
         elif data.totalSleepHours > 12:
-            anomalies.append("⚠️ Hypersomnie détectée (> 12h)")
+            anomalies.append("Hypersomnie détectée (> 12h)")
         
         # Hydratation
         if data.totalHydrationLiters < 1.0:
-            anomalies.append("⚠️ Déshydratation potentielle (< 1L)")
+            anomalies.append("Déshydratation potentielle (< 1L)")
         
         # Stress
         if data.stressScore >= 80:
-            anomalies.append("⚠️ Niveau de stress critique (≥ 80/100)")
+            anomalies.append("Niveau de stress critique (≥ 80/100)")
         
         # SpO2
         if data.oxygenSaturation and len(data.oxygenSaturation) > 0:
             latest_spo2 = data.oxygenSaturation[-1].get('percentage', 100)
             if latest_spo2 < 90:
-                anomalies.append("🚨 ALERTE: Hypoxie sévère (SpO2 < 90%)")
+                anomalies.append("ALERTE: Hypoxie sévère (SpO2 < 90%)")
             elif latest_spo2 < 95:
-                anomalies.append("⚠️ Oxygénation sous-optimale (SpO2 < 95%)")
+                anomalies.append("Oxygénation sous-optimale (SpO2 < 95%)")
         
         # Température
         if data.bodyTemperature and len(data.bodyTemperature) > 0:
             latest_temp = data.bodyTemperature[-1].get('temperature', 36.5)
             if latest_temp >= 38.0:
-                anomalies.append(f"⚠️ Fièvre détectée ({latest_temp:.1f}°C)")
+                anomalies.append(f"Fièvre détectée ({latest_temp:.1f}°C)")
             elif latest_temp < 36.0:
-                anomalies.append(f"⚠️ Hypothermie ({latest_temp:.1f}°C)")
+                anomalies.append(f"Hypothermie ({latest_temp:.1f}°C)")
         
         # Tension artérielle
         if data.bloodPressure and len(data.bloodPressure) > 0:
@@ -310,15 +310,15 @@ class AdvancedHealthAnalyzer:
             diastolic = latest_bp.get('diastolic', 80)
             
             if systolic >= 180 or diastolic >= 120:
-                anomalies.append("🚨 URGENCE: Crise hypertensive (TA ≥ 180/120)")
+                anomalies.append("URGENCE: Crise hypertensive (TA ≥ 180/120)")
             elif systolic >= 140 or diastolic >= 90:
-                anomalies.append(f"⚠️ Hypertension ({systolic}/{diastolic})")
+                anomalies.append(f"Hypertension ({systolic}/{diastolic})")
             elif systolic < 90 or diastolic < 60:
-                anomalies.append(f"⚠️ Hypotension ({systolic}/{diastolic})")
+                anomalies.append(f"Hypotension ({systolic}/{diastolic})")
         
         # Activité
         if data.totalSteps < 1000:
-            anomalies.append("⚠️ Sédentarité excessive (< 1000 pas)")
+            anomalies.append("Sédentarité excessive (< 1000 pas)")
         
         return anomalies
     
