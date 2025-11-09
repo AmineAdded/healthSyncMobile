@@ -33,6 +33,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 class UserMetricsActivity : ComponentActivity() {
     private lateinit var cardAnalyze: androidx.cardview.widget.CardView
@@ -1208,67 +1209,85 @@ class UserMetricsActivity : ComponentActivity() {
         }
     }
 
+
     private fun sendToServer(jsonData: String) {
         lifecycleScope.launch {
             try {
-                Toast.makeText(this@UserMetricsActivity, "🔄 Connexion au serveur...", Toast.LENGTH_SHORT).show()
+                // 1. Envoyer au Spring Boot (MongoDB)
+                val springBootUrl = "https://discounts-redhead-generates-kinds.trycloudflare.com/fetch"
 
                 val result = withContext(Dispatchers.IO) {
-                    val serverUrl = "https://pleuropneumonic-ferromagnetic-conrad.ngrok-free.dev/fetch"
-
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@UserMetricsActivity, "📡 POST vers: $serverUrl", Toast.LENGTH_SHORT).show()
-                    }
-
                     val client = OkHttpClient.Builder()
-                        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                        .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .connectTimeout(30, TimeUnit.SECONDS)
                         .build()
 
                     val requestBody = jsonData.toRequestBody("application/json".toMediaType())
                     val request = Request.Builder()
-                        .url(serverUrl)
+                        .url(springBootUrl)
                         .post(requestBody)
-                        .addHeader("Content-Type", "application/json")
-                        .addHeader("Accept", "application/json")
                         .build()
 
                     val response = client.newCall(request).execute()
-                    val responseCode = response.code
-                    val responseBody = response.body?.string() ?: "Aucune réponse"
-
-                    Log.d("HealthSync", "Response: $responseCode - $responseBody")
-
+                    val responseBody = response.body?.string() ?: ""
                     response.close()
-
-                    Pair(responseCode, responseBody)
+                    responseBody
                 }
 
-                val (responseCode, responseBody) = result
+                Toast.makeText(this@UserMetricsActivity, "✅ Données enregistrées!", Toast.LENGTH_SHORT).show()
 
-                if (responseCode in 200..299) {
-                    Toast.makeText(
-                        this@UserMetricsActivity,
-                        "✅ Succès! $responseBody",
-                        Toast.LENGTH_LONG
-                    ).show()
-                } else {
-                    Toast.makeText(
-                        this@UserMetricsActivity,
-                        "❌ Erreur HTTP $responseCode",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+                // 2. Lancer l'analyse IA
+                launchAIAnalysis(jsonData)
 
             } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(
-                    this@UserMetricsActivity,
-                    "❌ Erreur: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this@UserMetricsActivity, "❌ Erreur: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun launchAIAnalysis(jsonData: String) {
+        // Convertir le JSON complet en format attendu par l'IA
+        val aiJsonData = convertToAIFormat(jsonData)
+
+        val intent = Intent(this, HealthAnalysisActivity::class.java)
+        intent.putExtra(HealthAnalysisActivity.EXTRA_USER_DATA, aiJsonData)
+        startActivity(intent)
+    }
+
+    private fun convertToAIFormat(fullJson: String): String {
+        try {
+            val fullData = JSONObject(fullJson)
+            val dailyData = fullData.getJSONArray("dailyData")
+
+            // Prendre les données du premier jour (aujourd'hui)
+            if (dailyData.length() > 0) {
+                val todayData = dailyData.getJSONObject(0)
+
+                // Créer le format attendu par l'IA
+                val aiFormat = JSONObject()
+                aiFormat.put("totalSteps", todayData.optInt("totalSteps", 0))
+                aiFormat.put("avgHeartRate", todayData.optInt("avgHeartRate", 70))
+                aiFormat.put("minHeartRate", todayData.optInt("minHeartRate", 60))
+                aiFormat.put("maxHeartRate", todayData.optInt("maxHeartRate", 90))
+                aiFormat.put("totalDistanceKm", todayData.optString("totalDistanceKm", "0.00").toDouble())
+                aiFormat.put("totalSleepHours", todayData.optString("totalSleepHours", "7.0").toDouble())
+                aiFormat.put("totalHydrationLiters", todayData.optString("totalHydrationLiters", "2.0").toDouble())
+                aiFormat.put("stressLevel", todayData.optString("stressLevel", "Modéré"))
+                aiFormat.put("stressScore", todayData.optInt("stressScore", 50))
+
+                // Copier les tableaux
+                aiFormat.put("oxygenSaturation", todayData.optJSONArray("oxygenSaturation") ?: JSONArray())
+                aiFormat.put("bodyTemperature", todayData.optJSONArray("bodyTemperature") ?: JSONArray())
+                aiFormat.put("bloodPressure", todayData.optJSONArray("bloodPressure") ?: JSONArray())
+                aiFormat.put("weight", todayData.optJSONArray("weight") ?: JSONArray())
+                aiFormat.put("height", todayData.optJSONArray("height") ?: JSONArray())
+                aiFormat.put("exercise", todayData.optJSONArray("exercise") ?: JSONArray())
+
+                return aiFormat.toString()
+            }
+        } catch (e: Exception) {
+            Log.e("HealthSync", "Erreur conversion AI format", e)
+        }
+
+        return fullJson
     }
 }

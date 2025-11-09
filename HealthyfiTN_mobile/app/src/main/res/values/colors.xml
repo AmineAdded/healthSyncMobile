@@ -41,5 +41,15 @@
     <color name="primary_green">#4CAF50</color>
     <color name="accent_blue">#2196F3</color>
 
+    <color name="green_500">#4CAF50</color>
+    <color name="blue_500">#2196F3</color>
+    <color name="red_500">#F44336</color>
+    <color name="orange_500">#FF9800</color>
+    <color name="yellow_500">#FFEB3B</color>
+    <color name="purple_500">#9C27B0</color>
+    <color name="teal_500">#009688</color>
+    <color name="gray_500">#9E9E9E</color>
+    <color name="gray_700">#616161</color>
+
 
 </resources>
